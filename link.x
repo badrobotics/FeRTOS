@@ -36,6 +36,15 @@ SECTIONS
     *(.rodata .rodata.*);
   } > FLASH
 
+  /* Create a section in RAM for where the Vector Table will be relocated  */
+  .ram_vtable ORIGIN(RAM) :
+  {
+    /* Make sure there is enough reserved space for the table */
+    /* There are 155 interrupts in the TM4C123 at 4 bytes each */
+    _svtable = .;
+    . += 4 * 155;
+  } > RAM
+
   .bss :
   {
     _sbss = .;
