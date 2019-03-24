@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod task;
+
 use core::panic::PanicInfo;
 use core::ptr;
 

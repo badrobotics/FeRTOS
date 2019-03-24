@@ -5,3 +5,7 @@ authors = ["Bijan Tabatabai <bijan311@yahoo.com>"]
 edition = "2018"
 
 [dependencies]
+rust_tm4c123 = { path = "../rust_tm4c123" }
+
+[build-dependencies]
+cc = "1.0.25"
