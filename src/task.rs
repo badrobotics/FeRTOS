@@ -14,7 +14,7 @@ struct Task {
 const MAX_TASKS: usize = 10;
 const INIT_XPSR: u32 = 0x01000000;
 const IRQ_STACK_SIZE: u32 = 4 * 16;
-const IDLE_STACK_SIZE: usize = 64;
+const IDLE_STACK_SIZE: usize = 4 * 64;
 
 static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
 static mut TASKS: [Task; MAX_TASKS] = [Task { sp: &0, ep: idle }; MAX_TASKS];
