@@ -25,9 +25,9 @@ const IDLE_STACK_SIZE: usize = 64;
 
 static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
 static mut TASKS: [Task; MAX_TASKS] = [Task { sp: StackPtr {num: 0}, ep: idle }; MAX_TASKS];
-static mut NUM_TASKS: usize = 0;
+static mut NUM_TASKS: usize = 1;
 static mut NEXT_TASK: usize = 0;
-static mut CUR_TASK: usize = 7;
+static mut CUR_TASK: usize = 0;
 
 extern "C" {
     pub fn context_switch();
@@ -62,7 +62,8 @@ pub unsafe extern "C" fn sys_tick() {
     NEXT_TASK = if CUR_TASK + 1 < NUM_TASKS {
         CUR_TASK + 1
     } else {
-        0
+        //Reset to 1 because TASK[0] is for the initial thread of execution
+        1
     };
 
     interrupt::trigger_pendsv();
