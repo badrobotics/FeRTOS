@@ -14,7 +14,7 @@ struct Task {
 const MAX_TASKS: usize = 10;
 const INIT_XPSR: u32 = 0x01000000;
 const IRQ_STACK_SIZE: u32 = 4 * 16;
-const IDLE_STACK_SIZE: usize = 4 * 64;
+const IDLE_STACK_SIZE: usize = 64;
 
 static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
 static mut TASKS: [Task; MAX_TASKS] = [Task { sp: &0, ep: idle }; MAX_TASKS];
@@ -57,8 +57,8 @@ pub unsafe extern "C" fn sys_tick() {
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(stack_ptr: *mut u32, stack_size: usize, entry_point: fn()) {
-    let mut cur_ptr = ((stack_ptr as u32) + (stack_size as u32) - 4) as *mut u32;
+unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn()) {
+    let mut cur_ptr = ((stack_ptr as u32) + IRQ_STACK_SIZE - 4) as *mut u32;
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
@@ -85,11 +85,11 @@ pub unsafe fn add_task(stack_ptr: &'static u32, stack_size: usize, entry_point: 
             //Arm uses a full descending stack so we have to start from the top
             //and we also have to consider the data the IRQ handler expects to be
             //at the top of the stack when we context switch.
-            sp: ((stack_ptr as *const u32 as u32) + (stack_size as u32) - IRQ_STACK_SIZE) as *const u32,
+            sp: ((stack_ptr as *const u32 as u32) + (4 * (stack_size as u32)) - IRQ_STACK_SIZE) as *const u32,
             ep: entry_point
         };
 
-        set_initial_stack(stack_ptr as *const u32 as *mut u32, stack_size, entry_point);
+        set_initial_stack(TASKS[NUM_TASKS].sp, entry_point);
 
         NUM_TASKS += 1;
 
