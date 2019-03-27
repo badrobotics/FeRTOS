@@ -14,7 +14,7 @@ Important things to note when using this crate in your own projects:
     * You should use the macro `entry!(main);` at the before the declaration of main to make sure it's of the right type
 
 To add this crate to you project, simply open the project's Cargo.toml file and add
-`rt = { path = "path to crate"}` under `[dependencies]`
+`fe_rtos = { path = "path to crate"}` under `[dependencies]`
 
 To build and load a program using this crate to a microcontroller, you'll need the following programs:
 * OpenOCD
@@ -29,5 +29,4 @@ To load the binary onto the board:
 1. In GDB, type in `target extended-remote :3333` to connect to the openocd server
 1. Finally, type `load` and hopefully that will flash the binary onto the board.
 
-Literally 100% of this code was taken from https://docs.rust-embedded.org/embedonomicon/preface.html, but it is a good
-starting point that we can expand on.
+This code started from the examples at https://docs.rust-embedded.org/embedonomicon/preface.html.
