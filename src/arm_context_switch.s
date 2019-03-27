@@ -4,6 +4,7 @@
     .weak set_cur_task
     .weak get_next_task
     .weak get_task_table
+    .weak get_task_size
     .global context_switch
     .global ret_from_isr
     .thumb_func
@@ -16,7 +17,8 @@ context_switch:
     PUSH {R4 - R11}
 
     //The size of the Task struct
-    MOV R4, #8
+    BL get_task_size
+    MOV R4, R0
 
     //Load the variables
     //The return value is in R0

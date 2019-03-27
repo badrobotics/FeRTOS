@@ -53,6 +53,11 @@ pub unsafe extern "C" fn get_task_table() -> *const u32 {
     &TASKS[0] as *const Task as *const u32
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn get_task_size() -> usize {
+    core::mem::size_of::<Task>()
+}
+
 pub unsafe extern "C" fn sys_tick() {
     NEXT_TASK = if CUR_TASK + 1 < NUM_TASKS {
         CUR_TASK + 1
