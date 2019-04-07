@@ -80,16 +80,30 @@ unsafe impl GlobalAlloc for FeAllocator {
         };
         let header_data = *(header as *const usize);
         let old_size = header_data & SIZE_MASK;
+        let is_first = (header_data & FIRST_MASK) == FIRST_MASK;
+        let is_last = (header_data & LAST_MASK) == LAST_MASK;
+
         let next_header = header + old_size;
-        let next_hdr_data = *(next_header as *const usize);
+        let next_hdr_data = if is_last {
+            //If the current block is the last one, we have no guarentees that
+            //reading from the "next" one is valid
+            0
+        } else {
+            *(next_header as *const usize)
+        };
+
         let prev_footer = header - size_of::<usize>();
-        let prev_ftr_data = *(prev_footer as *const usize);
+        let prev_ftr_data = if is_first {
+            //If the current block is the first one, we have no guarentees that
+            //reading from the "previous" one is valid
+            0
+        } else {
+            *(prev_footer as *const usize)
+        };
 
         //coalesce this block with adjacent free blocks if able
-        let left_coalesce = (header_data & FIRST_MASK) == 0
-                            && (prev_ftr_data & ALLOC_MASK) == 0;
-        let right_coalesce = (header_data & LAST_MASK) == 0
-                            && (next_hdr_data & ALLOC_MASK) == 0;
+        let left_coalesce = !is_first && (prev_ftr_data & ALLOC_MASK) == 0;
+        let right_coalesce = !is_last && (next_hdr_data & ALLOC_MASK) == 0;
         let new_header = if  left_coalesce {
             header - (prev_ftr_data & SIZE_MASK)
         } else {
