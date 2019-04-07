@@ -1,4 +1,4 @@
-/* Memory layout of the LM3S6965 microcontroller */
+/* Memory layout of the TM4C123 microcontroller */
 /* 1K = 1 KiBi = 1024 bytes */
 MEMORY
 {
@@ -60,6 +60,15 @@ SECTIONS
   } > RAM
 
   _sidata = LOADADDR(.data);
+
+  /* Make sure the heap is 8 byte aligned */
+  .heap ALIGN(0x8):
+  {
+    _sheap = .;
+    /* Make the heap 10k in size */
+    . += 10 * 1024;
+    _eheap = .;
+  } > RAM
 
   /DISCARD/ :
   {
