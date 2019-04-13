@@ -18,7 +18,11 @@ pub struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
-    ep: fn()
+    ep: fn(),
+    //For sleeping and then waking tasks
+    asleep: bool,
+    //When to wake up the task
+    wake_up_tick: usize,
 }
 
 const INIT_XPSR: u32 = 0x01000000;
@@ -26,8 +30,14 @@ const IDLE_STACK_SIZE: usize = 64;
 
 static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
 static mut TASKS: Vec<Task> = Vec::new();
-static mut TASK_INDX: usize = 0;
-static mut IDLE_TASK: Task = Task { sp: StackPtr { num: 0 }, ep: idle };
+static mut TICKS: usize = 0;
+static mut TASK_INDEX: usize = 0;
+static mut IDLE_TASK: Task = Task {
+                                sp: StackPtr { num: 0 },
+                                ep: idle,
+                                asleep: false,
+                                wake_up_tick: 0
+                             };
 static mut NEXT_TASK: &Task = unsafe { &IDLE_TASK };
 static mut CUR_TASK: &Task = unsafe { &IDLE_TASK };
 
@@ -50,16 +60,65 @@ pub unsafe extern "C" fn get_next_task() -> &'static Task {
     NEXT_TASK
 }
 
-pub unsafe extern "C" fn sys_tick() {
-    NEXT_TASK = if TASK_INDX + 1 <  TASKS.len() {
-        TASK_INDX += 1;
-        &TASKS[TASK_INDX]
-    } else {
-        TASK_INDX = 0;
-        &TASKS[TASK_INDX]
-    };
+unsafe fn scheduler() {
+    let mut task_found = false;
+    let cur_index = TASK_INDEX;
 
+    //Loop through the tasks to find the next awake task to run
+    loop {
+        TASK_INDEX += 1;
+        if TASK_INDEX >= TASKS.len() {
+            TASK_INDEX = 0;
+        }
+
+        let task = &mut TASKS[TASK_INDEX];
+
+        if !task.asleep {
+            //If the task is awake, great! let's run it
+            task_found = true;
+            break;
+        } else {
+            //If this task is asleep, see if we should wake it up
+            if task.wake_up_tick < TICKS {
+                task_found = true;
+                //If we wake the task up, we can run it
+                task.asleep = false;
+                break;
+            }
+        }
+
+        //If TASK_INDEX is equal to cur_index that means all of the threads
+        //are sleeping
+        if TASK_INDEX == cur_index {
+            break;
+        }
+    }
+
+    NEXT_TASK = if task_found {
+        &TASKS[TASK_INDEX]
+    } else {
+        //If an awake task is not found, that means all of the tasks
+        //are asleep, so we should schedule the idle task
+        &IDLE_TASK
+    }
+}
+
+pub unsafe extern "C" fn sys_tick() {
+    TICKS += 1;
+    scheduler();
     interrupt::trigger_pendsv();
+}
+
+//Puts the currently running thread to sleep for the specified number
+//of ticks
+pub fn sleep(sleep_ticks: usize) {
+    unsafe {
+        TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
+        TASKS[TASK_INDEX].asleep = true;
+        //Trigger a context switch and wait until that happens
+        interrupt::trigger_pendsv();
+        while TASKS[TASK_INDEX].asleep {}
+    }
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
@@ -93,7 +152,9 @@ pub unsafe fn add_task(stack_ptr: &'static u32, stack_size: usize, entry_point: 
         sp: StackPtr {
                 reference: stack_ptr
             },
-        ep: entry_point
+        ep: entry_point,
+        asleep: false,
+        wake_up_tick: 0,
     };
 
     //Arm uses a full descending stack so we have to start from the top
@@ -115,7 +176,7 @@ pub fn start_scheduler() {
     }
 
     //Basically, wait for the scheduler to start
-    interrupt::enable_systick(1000000);
+    interrupt::enable_systick(16000);
 
     loop {}
 }
