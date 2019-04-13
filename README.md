@@ -22,6 +22,10 @@ To build and load a program using this crate to a microcontroller, you'll need t
 
 To build the project, simply run `cargo build` in the project's root directory.
 
+If you want to use the heap allocator with Rust's built in collections, you will need to use the nightly rust build. You can enable
+this by running `rustup default nightly`. To revert back to stable rust, run `rustup default stable`.
+The stable version with this functionality included will be rust 1.35 which is scheduled for release on [May 23, 2019](https://github.com/rust-lang/rust/milestones)
+
 To load the binary onto the board:
 1. Run `openocd -f <path to config file>`
     * For me, the file was located at /usr/share/openocd/scripts/board/ek-tm4c123gxl.cfg
