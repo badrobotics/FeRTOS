@@ -170,8 +170,13 @@ impl FeAllocator {
         *alloc_header = size | ALLOC_MASK | is_first;
         *alloc_footer = *alloc_header;
 
-        *unalloc_header = ((old_size - size) & SIZE_MASK) | is_last;
-        *unalloc_footer = *unalloc_header;
+        // If the block that we are allocating from is greater than
+        // The size that we need, make a new unallocated block with
+        // the excess
+        if old_size > size {
+            *unalloc_header = ((old_size - size) & SIZE_MASK) | is_last;
+            *unalloc_footer = *unalloc_header;
+        }
 
         //compute the pointer
         let data_ptr = (header_ptr + size_of::<usize>() + layout.align() - 1) & !(layout.align() - 1);
