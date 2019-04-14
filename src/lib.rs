@@ -1,5 +1,7 @@
 #![no_std]
+#![feature(alloc)]
 #![feature(alloc_error_handler)]
+#![feature(const_vec_new)]
 
 pub mod fe_alloc;
 pub mod task;
