@@ -14,6 +14,11 @@ use fe_alloc::FeAllocator;
 #[global_allocator]
 static mut A: FeAllocator = FeAllocator;
 
+extern "C" {
+    fn disable_interrupts();
+    fn enable_interrupts();
+}
+
 // The reset handler
 #[no_mangle]
 pub unsafe extern "C" fn Reset() -> ! {
