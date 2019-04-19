@@ -53,6 +53,8 @@ unsafe impl GlobalAlloc for FeAllocator {
             intermediate
         };
 
+        super::disable_interrupts();
+
         //Loop through the heap to find an unallocated block with enough room
         while header_ptr < heap_max {
             let header_data = *(header_ptr as *const usize);
@@ -65,6 +67,8 @@ unsafe impl GlobalAlloc for FeAllocator {
 
             header_ptr += header_data & SIZE_MASK;
         }
+
+        super::enable_interrupts();
 
         data_ptr
     }
@@ -82,6 +86,8 @@ unsafe impl GlobalAlloc for FeAllocator {
         let old_size = header_data & SIZE_MASK;
         let is_first = (header_data & FIRST_MASK) == FIRST_MASK;
         let is_last = (header_data & LAST_MASK) == LAST_MASK;
+
+        super::disable_interrupts();
 
         let next_header = header + old_size;
         let next_hdr_data = if is_last {
@@ -131,10 +137,11 @@ unsafe impl GlobalAlloc for FeAllocator {
         } else {
             *(new_header as *mut usize) |= header_data & LAST_MASK;
         }
+        *(new_footer as *mut usize) = *(new_header as *mut usize);
 
         HEAP_REMAINING += old_size;
 
-        *(new_footer as *mut usize) = *(new_header as *mut usize);
+        super::enable_interrupts();
     }
 }
 
@@ -149,6 +156,8 @@ impl FeAllocator {
         HEAP_SIZE = (&mut _eheap as *mut u8 as usize) - (HEAP as usize);
         HEAP_REMAINING = HEAP_SIZE;
 
+        super::disable_interrupts();
+
         //Basically just set the initial memory block header and footer
         let heap_ptr = HEAP as usize;
         let header = heap_ptr as *mut usize;
@@ -156,6 +165,8 @@ impl FeAllocator {
 
         *header = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
         *footer = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
+
+        super::enable_interrupts();
     }
 
     unsafe fn alloc_block(header_ptr: usize, size: usize, layout: Layout) -> *mut u8{

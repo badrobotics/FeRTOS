@@ -1,15 +1,15 @@
     .syntax unified
-    .section .text.context_switch
+    .section .text.asm
     .weak get_cur_task
     .weak set_cur_task
     .weak get_next_task
     .global context_switch
-    .global ret_from_isr
+    .global disable_interrupts
+    .global enable_interrupts
     .thumb_func
 context_switch:
     //R0 - Current Task
     //R1 - Next Task
-    //R2 - Pointer to Task table
 
     //Push registers R4-R11 of the old task
     PUSH {R4 - R11}
@@ -22,11 +22,9 @@ context_switch:
 
     //Switch stack pointers
     //Save the current stack pointer
-    MUL R3, R0, R4
     STR SP, [R0]
 
     //Load the new stack pointer
-    MUL R3, R1, R4
     LDR SP, [R1]
 
     //Set the CUR_TASK = NEXT_TASK
@@ -40,4 +38,14 @@ context_switch:
     POP {R4 - R11}
 
     MOV LR, 0xFFFFFFF9
+    BX LR
+
+    .thumb_func
+disable_interrupts:
+    cpsid if
+    BX LR
+
+    .thumb_func
+enable_interrupts:
+    cpsie if
     BX LR

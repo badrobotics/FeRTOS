@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<Error>> {
     //put link.x in the build directory
     File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link.x"))?;
 
-    Build::new().file("./src/arm_context_switch.s").compile("asm");
+    Build::new().file("./src/arm.s").compile("asm");
 
     Ok(())
 }
