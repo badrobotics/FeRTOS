@@ -22,7 +22,7 @@ pub struct Task {
     //For sleeping and then waking tasks
     asleep: bool,
     //When to wake up the task
-    wake_up_tick: usize,
+    wake_up_tick: u64,
 }
 
 const INIT_XPSR: u32 = 0x01000000;
@@ -30,7 +30,7 @@ const IDLE_STACK_SIZE: usize = 64;
 
 static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
 static mut TASKS: Vec<Task> = Vec::new();
-static mut TICKS: usize = 0;
+static mut TICKS: u64 = 0;
 static mut TASK_INDEX: usize = 0;
 static mut IDLE_TASK: Task = Task {
                                 sp: StackPtr { num: 0 },
@@ -109,9 +109,9 @@ pub unsafe extern "C" fn sys_tick() {
     interrupt::trigger_pendsv();
 }
 
-//Puts the currently running thread to sleep for the specified number
+//Puts the currently running thread to sleep for at least the specified number
 //of ticks
-pub fn sleep(sleep_ticks: usize) {
+pub fn sleep(sleep_ticks: u64) {
     unsafe {
         TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
         TASKS[TASK_INDEX].asleep = true;
