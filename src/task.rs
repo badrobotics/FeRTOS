@@ -1,11 +1,11 @@
 extern crate alloc;
 extern crate rust_tm4c123;
 
+use alloc::vec;
 use alloc::vec::Vec;
 use rust_tm4c123::interrupt;
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 union StackPtr {
     reference: &'static u32,
     ptr: *const u32,
@@ -13,12 +13,15 @@ union StackPtr {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
     ep: fn(),
+    //Holds the smart pointer to a dynamically allocated stack is applicable
+    //It needs to be a smart type to easily allow for deallocation of the stack
+    //if a task is deleted
+    dynamic_stack: Vec<u32>,
     //For sleeping and then waking tasks
     asleep: bool,
     //When to wake up the task
@@ -26,15 +29,16 @@ pub struct Task {
 }
 
 const INIT_XPSR: u32 = 0x01000000;
-const IDLE_STACK_SIZE: usize = 64;
+pub const DEFAULT_STACK_SIZE: usize = 128;
 
-static mut IDLE_STACK: [u32; IDLE_STACK_SIZE] = [0; IDLE_STACK_SIZE];
+static mut IDLE_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TASKS: Vec<Task> = Vec::new();
 static mut TICKS: u64 = 0;
 static mut TASK_INDEX: usize = 0;
 static mut IDLE_TASK: Task = Task {
                                 sp: StackPtr { num: 0 },
                                 ep: idle,
+                                dynamic_stack: Vec::new(),
                                 asleep: false,
                                 wake_up_tick: 0
                              };
@@ -147,12 +151,36 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn()) -> *const 
     (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task(stack_ptr: &'static u32, stack_size: usize, entry_point: fn()) -> bool {
+pub unsafe fn add_task(stack_size: usize, entry_point: fn()) -> bool {
+    let mut new_task = Task {
+        sp: StackPtr {
+                num: 0
+            },
+        ep: entry_point,
+        dynamic_stack: vec![0; stack_size],
+        asleep: false,
+        wake_up_tick: 0,
+    };
+
+    //Convert the adress of the first element of the vector into a ptr for the stack
+    new_task.sp.ptr = &new_task.dynamic_stack[0] as *const u32;
+    //Arm uses a full descending stack so we have to start from the top
+    new_task.sp.num += 4 * (stack_size as u32);
+
+    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point);
+
+    TASKS.push(new_task);
+
+    true
+}
+
+pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: fn()) -> bool {
     let mut new_task = Task {
         sp: StackPtr {
                 reference: stack_ptr
             },
         ep: entry_point,
+        dynamic_stack: Vec::new(),
         asleep: false,
         wake_up_tick: 0,
     };
@@ -171,7 +199,7 @@ pub fn start_scheduler() {
 
     unsafe {
         IDLE_TASK.sp.reference = &IDLE_STACK[0];
-        IDLE_TASK.sp.num += 4 * (IDLE_STACK_SIZE as u32);
+        IDLE_TASK.sp.num += 4 * (DEFAULT_STACK_SIZE as u32);
         IDLE_TASK.sp.ptr = set_initial_stack(IDLE_TASK.sp.ptr, idle);
     }
 
