@@ -1,9 +1,7 @@
 extern crate alloc;
-extern crate rust_tm4c123;
 
 use alloc::vec;
 use alloc::vec::Vec;
-use rust_tm4c123::interrupt;
 
 #[repr(C)]
 union StackPtr {
@@ -44,6 +42,8 @@ static mut IDLE_TASK: Task = Task {
                              };
 static mut NEXT_TASK: &Task = unsafe { &IDLE_TASK };
 static mut CUR_TASK: &Task = unsafe { &IDLE_TASK };
+
+static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
 extern "C" {
     pub fn context_switch();
@@ -110,7 +110,7 @@ unsafe fn scheduler() {
 pub unsafe extern "C" fn sys_tick() {
     TICKS += 1;
     scheduler();
-    interrupt::trigger_pendsv();
+    TRIGGER_CONTEXT_SWITCH();
 }
 
 //Puts the currently running thread to sleep for at least the specified number
@@ -120,7 +120,7 @@ pub fn sleep(sleep_ticks: u64) {
         TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
         TASKS[TASK_INDEX].asleep = true;
         //Trigger a context switch and wait until that happens
-        interrupt::trigger_pendsv();
+        TRIGGER_CONTEXT_SWITCH();
         while TASKS[TASK_INDEX].asleep {}
     }
 }
@@ -195,16 +195,18 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
     true
 }
 
-pub fn start_scheduler() {
+pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
 
     unsafe {
         IDLE_TASK.sp.reference = &IDLE_STACK[0];
         IDLE_TASK.sp.num += 4 * (DEFAULT_STACK_SIZE as u32);
         IDLE_TASK.sp.ptr = set_initial_stack(IDLE_TASK.sp.ptr, idle);
+
+        TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
     //Basically, wait for the scheduler to start
-    interrupt::enable_systick(16000);
+    enable_systick(reload_val);
 
     loop {}
 }
