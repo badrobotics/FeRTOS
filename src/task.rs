@@ -27,7 +27,7 @@ pub struct Task {
 }
 
 const INIT_XPSR: u32 = 0x01000000;
-pub const DEFAULT_STACK_SIZE: usize = 128;
+pub const DEFAULT_STACK_SIZE: usize = 512;
 
 static mut IDLE_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TASKS: Vec<Task> = Vec::new();
