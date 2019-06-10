@@ -10,6 +10,12 @@ union StackPtr {
     num: u32
 }
 
+enum TaskState {
+    Runnable,
+    Asleep,
+    Zombie,
+}
+
 #[repr(C)]
 pub struct Task {
     //Stack pointer
@@ -20,8 +26,7 @@ pub struct Task {
     //It needs to be a smart type to easily allow for deallocation of the stack
     //if a task is deleted
     dynamic_stack: Vec<u32>,
-    //For sleeping and then waking tasks
-    asleep: bool,
+    state: TaskState,
     //When to wake up the task
     wake_up_tick: u64,
 }
@@ -37,7 +42,7 @@ static mut IDLE_TASK: Task = Task {
                                 sp: StackPtr { num: 0 },
                                 ep: idle,
                                 dynamic_stack: Vec::new(),
-                                asleep: false,
+                                state: TaskState::Runnable,
                                 wake_up_tick: 0
                              };
 static mut NEXT_TASK: &Task = unsafe { &IDLE_TASK };
@@ -77,17 +82,31 @@ unsafe fn scheduler() {
 
         let task = &mut TASKS[TASK_INDEX];
 
-        if !task.asleep {
-            //If the task is awake, great! let's run it
-            task_found = true;
-            break;
-        } else {
-            //If this task is asleep, see if we should wake it up
-            if task.wake_up_tick < TICKS {
+        match task.state {
+            TaskState::Runnable => {
+                //If the task is awake, great! let's run it
                 task_found = true;
-                //If we wake the task up, we can run it
-                task.asleep = false;
                 break;
+            },
+            TaskState::Asleep => {
+                //If this task is asleep, see if we should wake it up
+                if task.wake_up_tick < TICKS {
+                    task_found = true;
+                    //If we wake the task up, we can run it
+                    task.state = TaskState::Runnable;
+                    break;
+                }
+            },
+            TaskState::Zombie => {
+                //Only remove a task if we are not the task being removed to avoid any
+                //issues of writing to unallocated memory
+                if TASK_INDEX != cur_index {
+                    //If this task has been removed, remove it from the list
+                    //and rust will dealloc everything
+                    TASKS.swap_remove(TASK_INDEX);
+                    TASK_INDEX -= 1;
+                    continue;
+                }
             }
         }
 
@@ -118,10 +137,15 @@ pub unsafe extern "C" fn sys_tick() {
 pub fn sleep(sleep_ticks: u64) {
     unsafe {
         TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
-        TASKS[TASK_INDEX].asleep = true;
+        TASKS[TASK_INDEX].state = TaskState::Asleep;
         //Trigger a context switch and wait until that happens
         TRIGGER_CONTEXT_SWITCH();
-        while TASKS[TASK_INDEX].asleep {}
+        loop {
+            match TASKS[TASK_INDEX].state {
+                TaskState::Asleep => (),
+                _ => break,
+            }
+        }
     }
 }
 
@@ -158,7 +182,7 @@ pub unsafe fn add_task(stack_size: usize, entry_point: fn()) -> bool {
             },
         ep: entry_point,
         dynamic_stack: vec![0; stack_size],
-        asleep: false,
+        state: TaskState::Runnable,
         wake_up_tick: 0,
     };
 
@@ -181,7 +205,7 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
             },
         ep: entry_point,
         dynamic_stack: Vec::new(),
-        asleep: false,
+        state: TaskState::Runnable,
         wake_up_tick: 0,
     };
 
@@ -193,6 +217,12 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
     TASKS.push(new_task);
 
     true
+}
+
+pub unsafe fn remove_task() {
+    TASKS[TASK_INDEX].state = TaskState::Zombie;
+    TRIGGER_CONTEXT_SWITCH();
+    loop {}
 }
 
 pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
