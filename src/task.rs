@@ -34,19 +34,19 @@ pub struct Task {
 const INIT_XPSR: u32 = 0x01000000;
 pub const DEFAULT_STACK_SIZE: usize = 512;
 
-static mut IDLE_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
+static mut KERNEL_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TASKS: Vec<Task> = Vec::new();
 static mut TICKS: u64 = 0;
 static mut TASK_INDEX: usize = 0;
-static mut IDLE_TASK: Task = Task {
+static mut KERNEL_TASK: Task = Task {
                                 sp: StackPtr { num: 0 },
                                 ep: idle,
                                 dynamic_stack: Vec::new(),
                                 state: TaskState::Runnable,
                                 wake_up_tick: 0
                              };
-static mut NEXT_TASK: &Task = unsafe { &IDLE_TASK };
-static mut CUR_TASK: &Task = unsafe { &IDLE_TASK };
+static mut NEXT_TASK: &Task = unsafe { &KERNEL_TASK };
+static mut CUR_TASK: &Task = unsafe { &KERNEL_TASK };
 
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
@@ -70,10 +70,11 @@ pub unsafe extern "C" fn get_next_task() -> &'static Task {
 }
 
 unsafe fn scheduler() {
-    let mut task_found = false;
     let cur_index = TASK_INDEX;
 
-    //Loop through the tasks to find the next awake task to run
+    //Loop through the tasks to find the next runnable task to execute.
+    //We don't have to worry about no tasks being runnable since the kernel task
+    //should never block
     loop {
         TASK_INDEX += 1;
         if TASK_INDEX >= TASKS.len() {
@@ -85,29 +86,9 @@ unsafe fn scheduler() {
         match task.state {
             TaskState::Runnable => {
                 //If the task is awake, great! let's run it
-                task_found = true;
                 break;
             },
-            TaskState::Asleep => {
-                //If this task is asleep, see if we should wake it up
-                if task.wake_up_tick < TICKS {
-                    task_found = true;
-                    //If we wake the task up, we can run it
-                    task.state = TaskState::Runnable;
-                    break;
-                }
-            },
-            TaskState::Zombie => {
-                //Only remove a task if we are not the task being removed to avoid any
-                //issues of writing to unallocated memory
-                if TASK_INDEX != cur_index {
-                    //If this task has been removed, remove it from the list
-                    //and rust will dealloc everything
-                    TASKS.swap_remove(TASK_INDEX);
-                    TASK_INDEX -= 1;
-                    continue;
-                }
-            }
+            _ => {}
         }
 
         //If TASK_INDEX is equal to cur_index that means all of the threads
@@ -117,13 +98,7 @@ unsafe fn scheduler() {
         }
     }
 
-    NEXT_TASK = if task_found {
-        &TASKS[TASK_INDEX]
-    } else {
-        //If an awake task is not found, that means all of the tasks
-        //are asleep, so we should schedule the idle task
-        &IDLE_TASK
-    }
+    NEXT_TASK = &TASKS[TASK_INDEX];
 }
 
 pub unsafe extern "C" fn sys_tick() {
@@ -228,9 +203,7 @@ pub unsafe fn remove_task() {
 pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
 
     unsafe {
-        IDLE_TASK.sp.reference = &IDLE_STACK[0];
-        IDLE_TASK.sp.num += 4 * (DEFAULT_STACK_SIZE as u32);
-        IDLE_TASK.sp.ptr = set_initial_stack(IDLE_TASK.sp.ptr, idle);
+        add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel);
 
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
@@ -239,6 +212,42 @@ pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), re
     enable_systick(reload_val);
 
     loop {}
+}
+
+fn kernel() {
+    unsafe {
+        loop {
+            let mut task_num: usize = 0;
+
+            while task_num < TASKS.len() {
+                let task = &mut TASKS[task_num];
+
+                match task.state {
+                    TaskState::Runnable => {},
+                    TaskState::Asleep => {
+                        //If this task is asleep, see if we should wake it up
+                        if task.wake_up_tick < TICKS {
+                            //If we wake the task up, we can run it
+                            task.state = TaskState::Runnable;
+                        }
+                    },
+                    TaskState::Zombie => {
+                        //If this task has been removed, remove it from the list
+                        //and rust will dealloc everything
+                        TASKS.swap_remove(task_num);
+                        task_num -= 1;
+                        continue;
+                    }
+                }
+
+                task_num += 1;
+            }
+
+            //Going through the loop multiple times without anything else running is
+            //useless since their states will not have changed, so do a context switch
+            TRIGGER_CONTEXT_SWITCH();
+        }
+    }
 }
 
 fn idle() {
