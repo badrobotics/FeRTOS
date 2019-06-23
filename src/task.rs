@@ -101,10 +101,14 @@ unsafe fn scheduler() {
     NEXT_TASK = &TASKS[TASK_INDEX];
 }
 
-pub unsafe extern "C" fn sys_tick() {
-    TICKS += 1;
+unsafe fn do_context_switch() {
     scheduler();
     TRIGGER_CONTEXT_SWITCH();
+}
+
+pub unsafe extern "C" fn sys_tick() {
+    TICKS += 1;
+    do_context_switch();
 }
 
 //Puts the currently running thread to sleep for at least the specified number
@@ -114,7 +118,7 @@ pub fn sleep(sleep_ticks: u64) {
         TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
         TASKS[TASK_INDEX].state = TaskState::Asleep;
         //Trigger a context switch and wait until that happens
-        TRIGGER_CONTEXT_SWITCH();
+        do_context_switch();
         loop {
             match TASKS[TASK_INDEX].state {
                 TaskState::Asleep => (),
@@ -196,7 +200,7 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
 
 pub unsafe fn remove_task() {
     TASKS[TASK_INDEX].state = TaskState::Zombie;
-    TRIGGER_CONTEXT_SWITCH();
+    do_context_switch();
     loop {}
 }
 
@@ -245,7 +249,7 @@ fn kernel() {
 
             //Going through the loop multiple times without anything else running is
             //useless since their states will not have changed, so do a context switch
-            TRIGGER_CONTEXT_SWITCH();
+            do_context_switch();
         }
     }
 }
