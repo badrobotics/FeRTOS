@@ -21,7 +21,7 @@ pub struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
-    ep: fn(),
+    ep: fn(*const u32),
     //Holds the smart pointer to a dynamically allocated stack is applicable
     //It needs to be a smart type to easily allow for deallocation of the stack
     //if a task is deleted
@@ -40,7 +40,7 @@ static mut TICKS: u64 = 0;
 static mut TASK_INDEX: usize = 0;
 static mut KERNEL_TASK: Task = Task {
                                 sp: StackPtr { num: 0 },
-                                ep: idle,
+                                ep: kernel,
                                 dynamic_stack: Vec::new(),
                                 state: TaskState::Runnable,
                                 wake_up_tick: 0
@@ -129,8 +129,12 @@ pub fn sleep(sleep_ticks: u64) {
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn()) -> *const u32 {
+unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn(*const u32), param: Option<*const u32>) -> *const u32 {
     let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
+    let param_val : u32 = match param {
+        Some(val) => val as u32,
+        None => 0
+    };
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
@@ -144,9 +148,11 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn()) -> *const 
     *cur_ptr = idle as u32;
     cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
-    //Clear all of the registers
+    //Set all of the registers
+    //Since we need R0 to be the parameter, and the other registers will be
+    //cleared on use, we'll set them all to the parameter
     for _i in 0..13 {
-        *cur_ptr = 0;
+        *cur_ptr = param_val;
         cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
     }
 
@@ -154,7 +160,7 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn()) -> *const 
     (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task(stack_size: usize, entry_point: fn()) -> bool {
+pub unsafe fn add_task(stack_size: usize, entry_point: fn(*const u32), param: Option<*const u32>) -> bool {
     let mut new_task = Task {
         sp: StackPtr {
                 num: 0
@@ -170,14 +176,14 @@ pub unsafe fn add_task(stack_size: usize, entry_point: fn()) -> bool {
     //Arm uses a full descending stack so we have to start from the top
     new_task.sp.num += 4 * (stack_size as u32);
 
-    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point);
+    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param);
 
     TASKS.push(new_task);
 
     true
 }
 
-pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: fn()) -> bool {
+pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: fn(*const u32), param: Option<*const u32>) -> bool {
     let mut new_task = Task {
         sp: StackPtr {
                 reference: stack_ptr
@@ -191,7 +197,7 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
     //Arm uses a full descending stack so we have to start from the top
     new_task.sp.num += 4 * (stack_size as u32);
 
-    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point);
+    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param);
 
     TASKS.push(new_task);
 
@@ -207,7 +213,7 @@ pub unsafe fn remove_task() {
 pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
 
     unsafe {
-        add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel);
+        add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
 
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
@@ -218,7 +224,7 @@ pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), re
     loop {}
 }
 
-fn kernel() {
+fn kernel(_ : *const u32) {
     unsafe {
         loop {
             let mut task_num: usize = 0;
