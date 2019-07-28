@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<Error>> {
     File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link.x"))?;
 
     Build::new().file("./src/arm.s").compile("asm");
+    Build::new().file("./src/arm_syscall.s").compile("syscall_asm");
 
     Ok(())
 }

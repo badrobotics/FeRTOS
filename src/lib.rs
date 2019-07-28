@@ -5,6 +5,7 @@
 
 pub mod fe_alloc;
 pub mod task;
+pub mod syscall;
 
 use core::panic::PanicInfo;
 use core::ptr;
