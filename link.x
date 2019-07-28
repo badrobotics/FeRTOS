@@ -9,8 +9,11 @@ MEMORY
 /* The entry point is the reset handler */
 ENTRY(Reset);
 
+/* Needed to avoid linker from rudely throwing away these symbols*/
 EXTERN(RESET_VECTOR);
 EXTERN(EXCEPTIONS);
+EXTERN(sys_exit);
+EXTERN(sys_sleep);
 
 SECTIONS
 {

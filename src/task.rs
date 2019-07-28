@@ -119,12 +119,6 @@ pub fn sleep(sleep_ticks: u64) {
         TASKS[TASK_INDEX].state = TaskState::Asleep;
         //Trigger a context switch and wait until that happens
         do_context_switch();
-        loop {
-            match TASKS[TASK_INDEX].state {
-                TaskState::Asleep => (),
-                _ => break,
-            }
-        }
     }
 }
 
@@ -207,7 +201,6 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
 pub unsafe fn remove_task() {
     TASKS[TASK_INDEX].state = TaskState::Zombie;
     do_context_switch();
-    loop {}
 }
 
 pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
