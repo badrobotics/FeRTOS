@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(alloc_error_handler)]
 #![feature(const_vec_new)]
 

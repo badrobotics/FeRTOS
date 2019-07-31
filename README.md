@@ -12,6 +12,9 @@ Important things to note when using this crate in your own projects:
     * Note: This is not the same main function in standard Rust, but what the runtime calls after it's done
     * It basically functions as a normal main function, but you must make sure it does not return
     * You should use the macro `entry!(main);` at the before the declaration of main to make sure it's of the right type
+* You may need download the rust information for your target before building
+    * This is done by running `rustup target add <target_arch>`
+    * For the tm4c, that would be `<target_arch>` would either be `thumbv7em-none-eabi` or `thumbv7em-none-eabihf`
 
 To add this crate to you project, simply open the project's Cargo.toml file and add
 `fe_rtos = { path = "path to crate"}` under `[dependencies]`
@@ -24,7 +27,6 @@ To build the project, simply run `cargo build` in the project's root directory.
 
 If you want to use the heap allocator with Rust's built in collections, you will need to use the nightly rust build. You can enable
 this by running `rustup default nightly`. To revert back to stable rust, run `rustup default stable`.
-The stable version with this functionality included will be rust 1.35 which is scheduled for release on [May 23, 2019](https://github.com/rust-lang/rust/milestones)
 
 To load the binary onto the board:
 1. Run `openocd -f <path to config file>`
