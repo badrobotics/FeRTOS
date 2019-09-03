@@ -9,9 +9,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     //extend the library search path
     println!("cargo:rustc-link-search={}", out_dir.display());
 
-    //put link.x in the build directory
-    File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link.x"))?;
-
     Build::new().file("./src/arm.s").compile("asm");
     Build::new().file("./src/arm_syscall.s").compile("syscall_asm");
 
