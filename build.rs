@@ -1,4 +1,4 @@
-use std::{env, error::Error, fs::File, io::Write, path::PathBuf};
+use std::{env, error::Error, path::PathBuf};
 
 use cc::Build;
 
