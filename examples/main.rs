@@ -93,18 +93,22 @@ pub fn main() -> ! {
             blink,
             Some(gpion as *const gpio::Gpio as *const u32),
         );
-
     }
 
     //bundle up the systick setup into a closure to pass to the scheduler
-    let systick_closure = || {
-        systick.enable_systick(cpu_freq / 1000);
-        unsafe {scb.SYSPRI3.modify(|x| x | (7 << 21)) } 
+    let systick_closure = |reload_val| {
+        systick.enable_systick(reload_val);
+        unsafe { scb.SYSPRI3.modify(|x| x | (7 << 21)) }
     };
+    let reload_val: u32 = cpu_freq / 1000;
 
     // Start the FeRTOS scheduler
-    fe_rtos::task::start_scheduler(rust_tm4c::tm4c1294_peripherals::trigger_pendsv, systick_closure);
-    
+    fe_rtos::task::start_scheduler(
+        rust_tm4c::tm4c1294_peripherals::trigger_pendsv,
+        systick_closure,
+        reload_val,
+    );
+
     // Loop forever. Should never get here.
     loop {}
 }

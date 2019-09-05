@@ -50,7 +50,6 @@ static mut CUR_TASK: &Task = unsafe { &KERNEL_TASK };
 
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
-
 extern "C" {
     pub fn context_switch();
 }
@@ -204,15 +203,17 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F) where F: FnOnce()  {
+pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32) where F: FnOnce(u32)  {
 
     unsafe {
         add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
+
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
-        enable_systick();
     }
-    
-    //wait for scheduler to start
+
+    //Basically, wait for the scheduler to start
+    enable_systick(reload_val);
+
     loop {}
 }
 
