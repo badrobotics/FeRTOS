@@ -204,12 +204,16 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler(trigger_context_switch: fn())  {
+pub fn start_scheduler<F>(trigger_context_switch: fn(), systick_enable: F) where F: FnOnce()  {
 
     unsafe {
         add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
+        systick_enable();
     }
+    
+    //wait for scheduler to start
+    loop {}
 }
 
 fn kernel(_ : *const u32) {
