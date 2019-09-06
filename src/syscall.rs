@@ -10,8 +10,8 @@ extern "C" fn sys_exit() {
 }
 
 #[no_mangle]
-extern "C" fn sys_sleep(seconds: u32) {
-    let ms: u64 = 1000 * seconds as u64;
+extern "C" fn sys_sleep(ms32: u32) {
+    let ms: u64 = ms32 as u64;
     task::sleep(ms);
 }
 
