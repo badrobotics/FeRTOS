@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use crate::syscall;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -204,6 +205,7 @@ pub unsafe fn remove_task() {
 }
 
 pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32) where F: FnOnce(u32)  {
+    syscall::link_syscalls();
 
     unsafe {
         add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
