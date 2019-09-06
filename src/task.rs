@@ -203,7 +203,7 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler(trigger_context_switch: fn(), enable_systick: fn(u32), reload_val: u32) {
+pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32) where F: FnOnce(u32)  {
 
     unsafe {
         add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
