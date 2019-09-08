@@ -1,12 +1,13 @@
 #![no_std]
-#![feature(alloc_error_handler)]
 #![feature(const_vec_new)]
 
-pub mod fe_alloc;
+extern crate fe_osi;
+
+mod fe_alloc;
 pub mod task;
 pub mod syscall;
 
-use fe_alloc::FeAllocator;
+use fe_osi::alloc::FeAllocator;
 
 //Declare the heap allocator so we can use Rust's collections
 #[global_allocator]
