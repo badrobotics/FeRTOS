@@ -5,6 +5,7 @@ authors = ["Bijan Tabatabai <bijan311@yahoo.com>"]
 edition = "2018"
 
 [dependencies]
+fe_osi = { path = "../fe_osi" }
 
 [build-dependencies]
 cc = "1.0.25"

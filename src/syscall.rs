@@ -1,4 +1,6 @@
 use crate::task;
+use crate::fe_alloc;
+use fe_osi::alloc::LayoutFFI;
 
 extern "C" {
     pub fn svc_handler();
@@ -23,3 +25,14 @@ extern "C" fn sys_sleep(ms32: u32) -> usize {
     0
 }
 
+#[no_mangle]
+extern "C" fn sys_alloc(layout: LayoutFFI) -> *mut u8 {
+    unsafe { return fe_alloc::alloc(layout); }
+}
+
+#[no_mangle]
+extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI)  -> usize {
+    unsafe { fe_alloc::dealloc(ptr, layout); }
+
+    0
+}

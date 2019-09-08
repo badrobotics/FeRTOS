@@ -2,9 +2,11 @@
     .section .text.asm
     .weak sys_exit
     .weak sys_sleep
+    .weak sys_alloc
+    .weak sys_dealloc
     .global svc_handler
 
-.equ max_svc, 1
+.equ max_svc, 3
 
     .thumb_func
 //Do not overwrite R0-R3 because they hold the syscall params
@@ -39,6 +41,8 @@ svc_handler:
 svc_jump_table:
     .word svc0 //exit
     .word svc1 //sleep
+    .word svc2 //alloc
+    .word svc3 //dealloc
 
     .thumb_func
 svc0:
@@ -47,6 +51,14 @@ svc0:
     .thumb_func
 svc1:
     BL sys_sleep
+    B svc_handler_end
+    .thumb_func
+svc2:
+    BL sys_alloc
+    B svc_handler_end
+    .thumb_func
+svc3:
+    BL sys_dealloc
     B svc_handler_end
     .thumb_func
 svc_handler_end:
