@@ -50,4 +50,8 @@ svc1:
     B svc_handler_end
     .thumb_func
 svc_handler_end:
+    //Save the return value
+    //Offset to the stored R0 is 0 + (registers pushed * 4)
+    STR R0, [SP, 0xC]
+
     POP {R4, R5, PC}
