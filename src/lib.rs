@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(const_vec_new)]
 
 extern crate fe_osi;
 
