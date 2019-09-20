@@ -3,6 +3,7 @@ extern crate alloc;
 use crate::syscall;
 use alloc::vec;
 use alloc::vec::Vec;
+use fe_osi::semaphore::Semaphore;
 
 #[repr(C)]
 union StackPtr {
@@ -13,7 +14,8 @@ union StackPtr {
 
 enum TaskState {
     Runnable,
-    Asleep,
+    Asleep(u64),
+    Blocking(*const Semaphore),
     Zombie,
 }
 
@@ -28,8 +30,6 @@ pub struct Task {
     //if a task is deleted
     dynamic_stack: Vec<u32>,
     state: TaskState,
-    //When to wake up the task
-    wake_up_tick: u64,
 }
 
 const INIT_XPSR: u32 = 0x01000000;
@@ -44,7 +44,6 @@ static mut KERNEL_TASK: Task = Task {
                                 ep: kernel,
                                 dynamic_stack: Vec::new(),
                                 state: TaskState::Runnable,
-                                wake_up_tick: 0
                              };
 static mut NEXT_TASK: &Task = unsafe { &KERNEL_TASK };
 static mut CUR_TASK: &Task = unsafe { &KERNEL_TASK };
@@ -116,9 +115,17 @@ pub unsafe extern "C" fn sys_tick() {
 //of ticks
 pub fn sleep(sleep_ticks: u64) {
     unsafe {
-        TASKS[TASK_INDEX].wake_up_tick = TICKS + sleep_ticks;
-        TASKS[TASK_INDEX].state = TaskState::Asleep;
+        TASKS[TASK_INDEX].state = TaskState::Asleep(TICKS + sleep_ticks);
         //Trigger a context switch and wait until that happens
+        do_context_switch();
+    }
+}
+
+//Has the currently running thread block until the semaphore it's blocking on
+//is available
+pub fn block(sem: *const Semaphore) {
+    unsafe {
+        TASKS[TASK_INDEX].state = TaskState::Blocking(sem);
         do_context_switch();
     }
 }
@@ -163,7 +170,6 @@ pub unsafe fn add_task(stack_size: usize, entry_point: fn(*const u32), param: Op
         ep: entry_point,
         dynamic_stack: vec![0; stack_size],
         state: TaskState::Runnable,
-        wake_up_tick: 0,
     };
 
     //Convert the adress of the first element of the vector into a ptr for the stack
@@ -186,7 +192,6 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
         ep: entry_point,
         dynamic_stack: Vec::new(),
         state: TaskState::Runnable,
-        wake_up_tick: 0,
     };
 
     //Arm uses a full descending stack so we have to start from the top
@@ -229,10 +234,18 @@ fn kernel(_ : *const u32) {
 
                 match task.state {
                     TaskState::Runnable => {},
-                    TaskState::Asleep => {
+                    TaskState::Asleep(wake_up_ticks) => {
                         //If this task is asleep, see if we should wake it up
-                        if task.wake_up_tick < TICKS {
+                        if wake_up_ticks < TICKS {
                             //If we wake the task up, we can run it
+                            task.state = TaskState::Runnable;
+                        }
+                    },
+                    TaskState::Blocking(sem) => {
+                        let sem_ref : &Semaphore = &*sem;
+                        //If the semaphore this task is blocking on is available
+                        //to be taken, wake up the task so it can attempt to take it
+                        if sem_ref.is_available() {
                             task.state = TaskState::Runnable;
                         }
                     },

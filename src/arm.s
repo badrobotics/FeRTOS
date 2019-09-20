@@ -34,6 +34,9 @@ context_switch:
     //Clear the CPU pipeline
     ISB
 
+    //Clear the exclusion monitors used in the LDREX and STREX instructions
+    CLREX
+
     //Pop registers R4-R11
     POP {R4 - R11}
 
