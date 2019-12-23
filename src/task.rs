@@ -3,13 +3,15 @@ extern crate alloc;
 use crate::syscall;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::any::Any;
+use core::ptr::copy_nonoverlapping;
 use fe_osi::semaphore::Semaphore;
 
 #[repr(C)]
 union StackPtr {
     reference: &'static u32,
     ptr: *const u32,
-    num: u32
+    num: u32,
 }
 
 enum TaskState {
@@ -24,7 +26,6 @@ pub struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
-    ep: fn(*const u32),
     //Holds the smart pointer to a dynamically allocated stack is applicable
     //It needs to be a smart type to easily allow for deallocation of the stack
     //if a task is deleted
@@ -40,11 +41,10 @@ static mut TASKS: Vec<Task> = Vec::new();
 static mut TICKS: u64 = 0;
 static mut TASK_INDEX: usize = 0;
 static mut KERNEL_TASK: Task = Task {
-                                sp: StackPtr { num: 0 },
-                                ep: kernel,
-                                dynamic_stack: Vec::new(),
-                                state: TaskState::Runnable,
-                             };
+    sp: StackPtr { num: 0 },
+    dynamic_stack: Vec::new(),
+    state: TaskState::Runnable,
+};
 static mut NEXT_TASK: &Task = unsafe { &KERNEL_TASK };
 static mut CUR_TASK: &Task = unsafe { &KERNEL_TASK };
 
@@ -87,7 +87,7 @@ unsafe fn scheduler() {
             TaskState::Runnable => {
                 //If the task is awake, great! let's run it
                 break;
-            },
+            }
             _ => {}
         }
 
@@ -131,12 +131,14 @@ pub fn block(sem: *const Semaphore) {
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn(*const u32), param: Option<*const u32>) -> *const u32 {
+unsafe fn set_initial_stack<T: Any>(
+    stack_ptr: *const u32,
+    entry_point: fn(T),
+    param: Option<T>,
+) -> *const u32 {
     let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
-    let param_val : u32 = match param {
-        Some(val) => val as u32,
-        None => 0
-    };
+    let param_val = param.unwrap();
+    let param_len = core::mem::size_of::<T>();
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
@@ -150,24 +152,17 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: fn(*const u32), 
     *cur_ptr = idle as u32;
     cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
-    //Set all of the registers
-    //Since we need R0 to be the parameter, and the other registers will be
-    //cleared on use, we'll set them all to the parameter
-    for _i in 0..13 {
-        *cur_ptr = param_val;
-        cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
-    }
+    let register_count = 12;
+    let offset = 4 * register_count - param_len - 4;
+    cur_ptr = (cur_ptr as u32 - offset as u32) as *mut u32;
+    copy_nonoverlapping(&param_val, cur_ptr as *mut T, param_len);
 
-    //In the for loop we subtracted 4 too many, so we have to add that back
-    (cur_ptr as u32 + 4) as *const u32
+    (cur_ptr as u32 - param_len as u32) as *const u32
 }
 
-pub unsafe fn add_task(stack_size: usize, entry_point: fn(*const u32), param: Option<*const u32>) -> bool {
+pub unsafe fn add_task<T: Any>(stack_size: usize, entry_point: fn(T), param: Option<T>) -> bool {
     let mut new_task = Task {
-        sp: StackPtr {
-                num: 0
-            },
-        ep: entry_point,
+        sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
         state: TaskState::Runnable,
     };
@@ -184,12 +179,16 @@ pub unsafe fn add_task(stack_size: usize, entry_point: fn(*const u32), param: Op
     true
 }
 
-pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: fn(*const u32), param: Option<*const u32>) -> bool {
+pub unsafe fn add_task_static<T: Any>(
+    stack_ptr: &'static u32,
+    stack_size: usize,
+    entry_point: fn(T),
+    param: Option<T>,
+) -> bool {
     let mut new_task = Task {
         sp: StackPtr {
-                reference: stack_ptr
-            },
-        ep: entry_point,
+            reference: stack_ptr,
+        },
         dynamic_stack: Vec::new(),
         state: TaskState::Runnable,
     };
@@ -209,7 +208,10 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32) where F: FnOnce(u32)  {
+pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32)
+where
+    F: FnOnce(u32),
+{
     syscall::link_syscalls();
 
     unsafe {
@@ -224,7 +226,7 @@ pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reloa
     loop {}
 }
 
-fn kernel(_ : *const u32) {
+fn kernel(_: *const u32) {
     unsafe {
         loop {
             let mut task_num: usize = 0;
@@ -233,22 +235,22 @@ fn kernel(_ : *const u32) {
                 let task = &mut TASKS[task_num];
 
                 match task.state {
-                    TaskState::Runnable => {},
+                    TaskState::Runnable => {}
                     TaskState::Asleep(wake_up_ticks) => {
                         //If this task is asleep, see if we should wake it up
                         if wake_up_ticks < TICKS {
                             //If we wake the task up, we can run it
                             task.state = TaskState::Runnable;
                         }
-                    },
+                    }
                     TaskState::Blocking(sem) => {
-                        let sem_ref : &Semaphore = &*sem;
+                        let sem_ref: &Semaphore = &*sem;
                         //If the semaphore this task is blocking on is available
                         //to be taken, wake up the task so it can attempt to take it
                         if sem_ref.is_available() {
                             task.state = TaskState::Runnable;
                         }
-                    },
+                    }
                     TaskState::Zombie => {
                         //If this task has been removed, remove it from the list
                         //and rust will dealloc everything
@@ -269,5 +271,5 @@ fn kernel(_ : *const u32) {
 }
 
 fn idle() {
-    loop{}
+    loop {}
 }

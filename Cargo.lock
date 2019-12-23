@@ -6,10 +6,18 @@ version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "fe_osi"
+version = "0.1.0"
+dependencies = [
+ "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "fe_rtos"
 version = "0.1.0"
 dependencies = [
  "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fe_osi 0.1.0",
 ]
 
 [metadata]
