@@ -1,10 +1,10 @@
 extern crate alloc;
 
 use crate::syscall;
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
-use alloc::boxed::Box;
 
 #[repr(C)]
 union StackPtr {
@@ -152,7 +152,7 @@ unsafe fn set_initial_stack<T: Send>(
     //get the address of the parameter
     let param_ptr = match param {
         Some(val) => Box::into_raw(val),
-        None => cur_ptr as *mut T
+        None => cur_ptr as *mut T,
     };
 
     for _i in 0..13 {
@@ -162,7 +162,11 @@ unsafe fn set_initial_stack<T: Send>(
     (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task<T: Send>(stack_size: usize, entry_point: fn(&mut T), param: Option<Box<T>>) -> bool {
+pub unsafe fn add_task<T: Send>(
+    stack_size: usize,
+    entry_point: fn(&mut T),
+    param: Option<Box<T>>,
+) -> bool {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
@@ -210,7 +214,11 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler(trigger_context_switch: fn(), mut systick: cortex_m::peripheral::SYST, reload_val: u32) {
+pub fn start_scheduler(
+    trigger_context_switch: fn(),
+    mut systick: cortex_m::peripheral::SYST,
+    reload_val: u32,
+) {
     syscall::link_syscalls();
 
     unsafe {
