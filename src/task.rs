@@ -3,9 +3,8 @@ extern crate alloc;
 use crate::syscall;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::any::Any;
-use core::ptr::copy_nonoverlapping;
 use fe_osi::semaphore::Semaphore;
+use alloc::boxed::Box;
 
 #[repr(C)]
 union StackPtr {
@@ -131,14 +130,12 @@ pub fn block(sem: *const Semaphore) {
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack<T: Any>(
+unsafe fn set_initial_stack<T: Send>(
     stack_ptr: *const u32,
-    entry_point: fn(T),
-    param: Option<T>,
+    entry_point: fn(&mut T),
+    param: Option<Box<T>>,
 ) -> *const u32 {
     let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
-    let param_val = param.unwrap();
-    let param_len = core::mem::size_of::<T>();
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
@@ -152,15 +149,20 @@ unsafe fn set_initial_stack<T: Any>(
     *cur_ptr = idle as u32;
     cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
-    let register_count = 12;
-    let offset = 4 * register_count - param_len - 4;
-    cur_ptr = (cur_ptr as u32 - offset as u32) as *mut u32;
-    copy_nonoverlapping(&param_val, cur_ptr as *mut T, param_len);
+    //get the address of the parameter
+    let param_ptr = match param {
+        Some(val) => Box::into_raw(val),
+        None => cur_ptr as *mut T
+    };
 
-    (cur_ptr as u32 - param_len as u32) as *const u32
+    for _i in 0..13 {
+        *cur_ptr = param_ptr as u32;
+        cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+    }
+    (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task<T: Any>(stack_size: usize, entry_point: fn(T), param: Option<T>) -> bool {
+pub unsafe fn add_task<T: Send>(stack_size: usize, entry_point: fn(&mut T), param: Option<Box<T>>) -> bool {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
@@ -179,11 +181,11 @@ pub unsafe fn add_task<T: Any>(stack_size: usize, entry_point: fn(T), param: Opt
     true
 }
 
-pub unsafe fn add_task_static<T: Any>(
+pub unsafe fn add_task_static<T: Send>(
     stack_ptr: &'static u32,
     stack_size: usize,
-    entry_point: fn(T),
-    param: Option<T>,
+    entry_point: fn(&mut T),
+    param: Option<Box<T>>,
 ) -> bool {
     let mut new_task = Task {
         sp: StackPtr {
@@ -208,25 +210,24 @@ pub unsafe fn remove_task() {
     do_context_switch();
 }
 
-pub fn start_scheduler<F>(trigger_context_switch: fn(), enable_systick: F, reload_val: u32)
-where
-    F: FnOnce(u32),
-{
+pub fn start_scheduler(trigger_context_switch: fn(), mut systick: cortex_m::peripheral::SYST, reload_val: u32) {
     syscall::link_syscalls();
 
     unsafe {
         add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
-
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
     //Basically, wait for the scheduler to start
-    enable_systick(reload_val);
+    systick.set_reload(reload_val);
+    systick.clear_current();
+    systick.enable_counter();
+    systick.enable_interrupt();
 
     loop {}
 }
 
-fn kernel(_: *const u32) {
+fn kernel(_: &mut u32) {
     unsafe {
         loop {
             let mut task_num: usize = 0;
