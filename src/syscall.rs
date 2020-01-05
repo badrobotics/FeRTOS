@@ -1,6 +1,6 @@
 use crate::task;
 use crate::fe_alloc;
-use fe_osi::alloc::LayoutFFI;
+use fe_osi::allocator::LayoutFFI;
 use fe_osi::semaphore::Semaphore;
 
 extern "C" {
@@ -41,6 +41,13 @@ extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI)  -> usize {
 #[no_mangle]
 extern "C" fn sys_block(sem: *const Semaphore) -> usize {
     task::block(sem);
+
+    0
+}
+
+#[no_mangle]
+extern "C" fn sys_task_spawn(stack_size: usize, entry_point: *const u32, parameter: *mut u32) -> usize {
+    unsafe { task::add_task(stack_size, entry_point, parameter); }
 
     0
 }

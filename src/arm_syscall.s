@@ -5,9 +5,10 @@
     .weak sys_alloc
     .weak sys_dealloc
     .weak sys_block
+    .weak sys_task_spawn
     .global svc_handler
 
-.equ max_svc, 4
+.equ max_svc, 5
 
     .thumb_func
 //Do not overwrite R0-R3 because they hold the syscall params
@@ -45,6 +46,7 @@ svc_jump_table:
     .word svc2 //alloc
     .word svc3 //dealloc
     .word svc4 //block
+    .word svc5 //task spawn
 
     .thumb_func
 svc0:
@@ -65,6 +67,10 @@ svc3:
     .thumb_func
 svc4:
     BL sys_block
+    B svc_handler_end
+    .thumb_func
+svc5:
+    BL sys_task_spawn
     B svc_handler_end
     .thumb_func
 svc_handler_end:

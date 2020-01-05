@@ -1,7 +1,6 @@
 extern crate alloc;
 
 use crate::syscall;
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
@@ -130,11 +129,7 @@ pub fn block(sem: *const Semaphore) {
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack<T: Send>(
-    stack_ptr: *const u32,
-    entry_point: fn(&mut T),
-    param: Option<Box<T>>,
-) -> *const u32 {
+unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: *const u32, param: *mut u32) -> *const u32 {
     let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
 
     //Set the xPSR
@@ -149,24 +144,14 @@ unsafe fn set_initial_stack<T: Send>(
     *cur_ptr = idle as u32;
     cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
-    //get the address of the parameter
-    let param_ptr = match param {
-        Some(val) => Box::into_raw(val),
-        None => cur_ptr as *mut T,
-    };
-
     for _i in 0..13 {
-        *cur_ptr = param_ptr as u32;
+        *cur_ptr = param as u32;
         cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
     }
     (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task<T: Send>(
-    stack_size: usize,
-    entry_point: fn(&mut T),
-    param: Option<Box<T>>,
-) -> bool {
+pub unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> bool {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
@@ -185,24 +170,21 @@ pub unsafe fn add_task<T: Send>(
     true
 }
 
-pub unsafe fn add_task_static<T: Send>(
-    stack_ptr: &'static u32,
-    stack_size: usize,
-    entry_point: fn(&mut T),
-    param: Option<Box<T>>,
-) -> bool {
+pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: *const u32, param: Option<*mut u32>) -> bool {
     let mut new_task = Task {
-        sp: StackPtr {
-            reference: stack_ptr,
-        },
+        sp: StackPtr { reference: stack_ptr, },
         dynamic_stack: Vec::new(),
         state: TaskState::Runnable,
     };
 
     //Arm uses a full descending stack so we have to start from the top
     new_task.sp.num += 4 * (stack_size as u32);
+    let param_ptr = match param {
+        Some(p) => p as *mut u32,
+        None => 0 as *mut u32
+    };
 
-    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param);
+    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param_ptr);
 
     TASKS.push(new_task);
 
@@ -222,7 +204,7 @@ pub fn start_scheduler(
     syscall::link_syscalls();
 
     unsafe {
-        add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel, None);
+        add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel as *const u32, None);
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 

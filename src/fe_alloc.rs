@@ -1,6 +1,6 @@
 use core::mem::size_of;
 use core::ptr::null_mut;
-use fe_osi::alloc::LayoutFFI;
+use fe_osi::allocator::LayoutFFI;
 
 /******************************************************************************
 * The structure of a heap memory block is the following:
