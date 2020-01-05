@@ -6,11 +6,11 @@ mod fe_alloc;
 pub mod task;
 pub mod syscall;
 
-use fe_osi::allocator::FeAllocator;
+use fe_alloc::KernelAllocator;
 
 //Declare the heap allocator so we can use Rust's collections
 #[global_allocator]
-static mut A: FeAllocator = FeAllocator;
+static mut A: KernelAllocator = KernelAllocator;
 
 extern "C" {
     fn disable_interrupts();

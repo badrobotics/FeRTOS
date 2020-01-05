@@ -1,3 +1,4 @@
+use core::alloc::{GlobalAlloc, Layout};
 use core::mem::size_of;
 use core::ptr::null_mut;
 use fe_osi::allocator::LayoutFFI;
@@ -24,6 +25,28 @@ const LAST_MASK: usize = 0x1;
 static mut HEAP: *mut u8 = null_mut();
 static mut HEAP_SIZE: usize = 0;
 static mut HEAP_REMAINING: usize = 0;
+
+pub struct KernelAllocator;
+
+unsafe impl GlobalAlloc for KernelAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let layout_ffi = LayoutFFI {
+            size: layout.size(),
+            align: layout.align(),
+        };
+
+        alloc(layout_ffi)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let layout_ffi = LayoutFFI {
+            size: layout.size(),
+            align: layout.align(),
+        };
+
+        dealloc(ptr, layout_ffi);
+    }
+}
 
 pub unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     //If HEAP points to, we need to initialize the heap
