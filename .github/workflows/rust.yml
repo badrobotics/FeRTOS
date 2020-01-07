@@ -8,6 +8,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: Switch to Nightly
+      run: rustup default nightly
+    - name: gcc
+      run: apt install arm-none-eabi-gcc
     - name: Add Target M3
       run: rustup target add thumbv7m-none-eabi
     - name: Add Target M4, M7
