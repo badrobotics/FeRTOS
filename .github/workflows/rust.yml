@@ -8,8 +8,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Add Target M0, M0+, M1
-      run: rustup target add thumbv6m-none-eabi
     - name: Add Target M3
       run: rustup target add thumbv7m-none-eabi
     - name: Add Target M4, M7
@@ -17,8 +15,6 @@ jobs:
     - name: Add Target M4F
       run: rustup target add thumbv7em-none-eabihf
       
-    - name: Build Cortex-M0, M0+, M1
-      run: cargo build --verbose --target=thumbv6m-none-eabi
     - name: Build Cortex-M3
       run: cargo build --verbose --target=thumbv7m-none-eabi
     - name: Build Cortex-M4, M7
