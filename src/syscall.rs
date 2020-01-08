@@ -1,3 +1,6 @@
+extern crate alloc;
+
+use alloc::boxed::Box;
 use crate::task;
 use crate::fe_alloc;
 use fe_osi::allocator::LayoutFFI;
@@ -47,7 +50,12 @@ extern "C" fn sys_block(sem: *const Semaphore) -> usize {
 
 #[no_mangle]
 extern "C" fn sys_task_spawn(stack_size: usize, entry_point: *const u32, parameter: *mut u32) -> usize {
-    unsafe { task::add_task(stack_size, entry_point, parameter); }
+    let task_info = Box::new(task::NewTaskInfo {
+        ep: entry_point,
+        param: parameter,
+    });
+
+    unsafe { task::add_task(stack_size, task::new_task_helper as *const u32, Box::into_raw(task_info) as *mut u32); }
 
     0
 }
