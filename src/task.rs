@@ -145,21 +145,21 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: *const u32, para
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
-    cur_ptr = cur_ptr.offset(-1);
+    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
     //Set the PC
     *cur_ptr = entry_point as u32;
-    cur_ptr = cur_ptr.offset(-1);
+    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
     //Set the LR
     *cur_ptr = idle as u32;
-    cur_ptr = cur_ptr.offset(-1);
+    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
 
-    //Load the parameter into R0
-    cur_ptr = cur_ptr.offset(-12);
-    *cur_ptr = param as u32;
-
-    cur_ptr as *const u32
+    for _i in 0..13 {
+        *cur_ptr = param as u32;
+        cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+    }
+    (cur_ptr as u32 + 4) as *const u32
 }
 
 pub unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> bool {
