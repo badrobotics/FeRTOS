@@ -32,7 +32,7 @@ pub struct Task {
     dynamic_stack: Vec<u32>,
     //Stores the param of the task if it was created with the task_spawn syscall
     //This will be a raw pointer to a Box that will need to be freed
-    param: *mut u32,
+    task_info: Option<Box<NewTaskInfo>>,
     state: TaskState,
 }
 
@@ -51,7 +51,7 @@ static mut TASK_INDEX: usize = 0;
 static mut KERNEL_TASK: Task = Task {
     sp: StackPtr { num: 0 },
     dynamic_stack: Vec::new(),
-    param: core::ptr::null_mut(),
+    task_info: None,
     state: TaskState::Runnable,
 };
 static mut NEXT_TASK: &Task = unsafe { &KERNEL_TASK };
@@ -166,7 +166,7 @@ pub unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
-        param: core::ptr::null_mut(),
+        task_info: None,
         state: TaskState::Runnable,
     };
 
@@ -186,7 +186,7 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
     let mut new_task = Task {
         sp: StackPtr { reference: stack_ptr, },
         dynamic_stack: Vec::new(),
-        param: core::ptr::null_mut(),
+        task_info: None,
         state: TaskState::Runnable,
     };
 
@@ -210,17 +210,11 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
 pub fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
     let task_param : &u32 = unsafe { &*task_info.param };
     let task_ep : fn(&u32) = unsafe { core::mem::transmute(task_info.ep) };
+    let task = unsafe { &mut TASKS[TASK_INDEX] };
 
-    unsafe {
-        TASKS[TASK_INDEX].param = task_info.param;
-    }
+    task.task_info = Some(task_info);
 
     task_ep(task_param);
-
-    //Free task_info
-    {
-        let _pass_ownership = task_info;
-    }
 
     fe_osi::exit();
 
@@ -281,11 +275,16 @@ fn kernel(_: &mut u32) {
                     TaskState::Zombie => {
                         //If this task has been removed, remove it from the list
                         //and rust will dealloc everything
-                        if !task.param.is_null() {
-                            Box::from_raw(task.param);
+                        //First, take care of the parameter, if there is one
+                        match &task.task_info {
+                            Some(info) => {
+                                if !info.param.is_null() {
+                                    core::mem::drop(Box::from_raw(info.param));
+                                }
+                            },
+                            None => (),
                         }
                         TASKS.swap_remove(task_num);
-                        task_num -= 1;
                         continue;
                     }
                 }
