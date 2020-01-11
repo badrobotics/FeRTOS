@@ -1,10 +1,10 @@
-This is the crate that contains the setup code to allow Rust programs to run on a bare-metal ARM CPU. It includes a few important things:
-* src/lib.sr
-    * Contains the reset point of the application as well as the panic handler
-* link.x
-    * A script file for the linker to make sure everything is where it's supposed to be in memory
-* build.rs
-    * Rust program that helps configure the build environment
+Current build status: ![Build Status](https://github.com/badrobotics/FeRTOS/workflows/Rust/badge.svg)
+
+FeRTOS is a simple "operating system" for ARM Cortex-M CPUs. It currently has the following features:
+* Ability to run multiple "tasks" simultaneously.
+* Support for dynamic memory allocation
+* Semaphores to help avoid race conditions (via [fe_osi](https://github.com/badrobotics/fe_osi))
+* Various system calls (via [fe_osi](https://github.com/badrobotics/fe_osi))
 
 Important things to note when using this crate in your own projects:
 * You must use the `#![no_std]` and `#![no_main]` attributes due to the limitations of running without an OS
