@@ -27,10 +27,6 @@ context_switch:
     //Load the new stack pointer
     LDR SP, [R1]
 
-    //Set the CUR_TASK = NEXT_TASK
-    MOV R0, R1
-    BL set_cur_task
-
     //Clear the CPU pipeline
     ISB
 

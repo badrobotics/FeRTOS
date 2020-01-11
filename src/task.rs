@@ -69,11 +69,6 @@ pub unsafe extern "C" fn get_cur_task() -> &'static Task {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn set_cur_task(new_val: &'static Task) {
-    CUR_TASK = new_val;
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn get_next_task() -> &'static Task {
     NEXT_TASK
 }
@@ -81,6 +76,9 @@ pub unsafe extern "C" fn get_next_task() -> &'static Task {
 unsafe fn scheduler() {
     let cur_index = TASK_INDEX;
 
+    if NEXT_TASK as *const Task != &KERNEL_TASK as *const Task {
+        CUR_TASK = &TASKS[cur_index];
+    }
     //Loop through the tasks to find the next runnable task to execute.
     //We don't have to worry about no tasks being runnable since the kernel task
     //should never block
@@ -111,7 +109,9 @@ unsafe fn scheduler() {
 }
 
 unsafe fn do_context_switch() {
+    super::disable_interrupts();
     scheduler();
+    super::enable_interrupts();
     TRIGGER_CONTEXT_SWITCH();
 }
 
