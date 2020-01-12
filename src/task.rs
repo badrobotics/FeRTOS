@@ -22,7 +22,7 @@ enum TaskState {
 }
 
 #[repr(C)]
-pub struct Task {
+pub (crate) struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
@@ -36,7 +36,7 @@ pub struct Task {
     state: TaskState,
 }
 
-pub struct NewTaskInfo {
+pub (crate) struct NewTaskInfo {
     pub ep: *const u32,
     pub param: *mut u32,
 }
@@ -64,12 +64,12 @@ extern "C" {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn get_cur_task() -> &'static Task {
+pub (crate) unsafe extern "C" fn get_cur_task() -> &'static Task {
     CUR_TASK
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn get_next_task() -> &'static Task {
+pub (crate) unsafe extern "C" fn get_next_task() -> &'static Task {
     NEXT_TASK
 }
 
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn sys_tick() {
 
 //Puts the currently running thread to sleep for at least the specified number
 //of ticks
-pub fn sleep(sleep_ticks: u64) {
+pub (crate) fn sleep(sleep_ticks: u64) {
     unsafe {
         TASKS[TASK_INDEX].state = TaskState::Asleep(TICKS + sleep_ticks);
         //Trigger a context switch and wait until that happens
@@ -132,7 +132,7 @@ pub fn sleep(sleep_ticks: u64) {
 
 //Has the currently running thread block until the semaphore it's blocking on
 //is available
-pub fn block(sem: *const Semaphore) {
+pub (crate) fn block(sem: *const Semaphore) {
     unsafe {
         TASKS[TASK_INDEX].state = TaskState::Blocking(sem);
         do_context_switch();
@@ -162,7 +162,7 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: *const u32, para
     (cur_ptr as u32 + 4) as *const u32
 }
 
-pub unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> bool {
+pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> bool {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
@@ -182,7 +182,7 @@ pub unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u
     true
 }
 
-pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: *const u32, param: Option<*mut u32>) -> bool {
+pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: *const u32, param: Option<*mut u32>) -> bool {
     let mut new_task = Task {
         sp: StackPtr { reference: stack_ptr, },
         dynamic_stack: Vec::new(),
@@ -207,7 +207,7 @@ pub unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_
 //This function is called by the task spawn syscall.
 //This function handles cleaning up after a task when
 //it returns
-pub fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
+pub (crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
     let task_param : &u32 = unsafe { &*task_info.param };
     let task_ep : fn(&u32) = unsafe { core::mem::transmute(task_info.ep) };
     let task = unsafe { &mut TASKS[TASK_INDEX] };
@@ -221,7 +221,7 @@ pub fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
     loop{}
 }
 
-pub unsafe fn remove_task() {
+pub (crate) unsafe fn remove_task() {
     TASKS[TASK_INDEX].state = TaskState::Zombie;
     do_context_switch();
 }
