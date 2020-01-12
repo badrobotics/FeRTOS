@@ -48,7 +48,7 @@ unsafe impl GlobalAlloc for KernelAllocator {
     }
 }
 
-pub unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
+pub (crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     //If HEAP points to, we need to initialize the heap
     if (HEAP as usize) == 0 {
         init_heap();
@@ -93,7 +93,7 @@ pub unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     data_ptr
 }
 
-pub unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
+pub (crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     //Recover the block header from the aligned data pointer
     let header = if layout.align > size_of::<usize>() {
         //If the alignment was big enough, a pointer to the
