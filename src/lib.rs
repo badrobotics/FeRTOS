@@ -5,6 +5,7 @@ extern crate fe_osi;
 mod fe_alloc;
 pub mod task;
 pub mod syscall;
+pub mod interrupt;
 
 use fe_alloc::KernelAllocator;
 
