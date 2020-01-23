@@ -1,5 +1,8 @@
 #![no_std]
+#![feature(const_mut_refs)]
 
+#[macro_use]
+extern crate lazy_static;
 extern crate fe_osi;
 
 mod fe_alloc;
