@@ -1,7 +1,6 @@
 extern crate alloc;
 extern crate crossbeam_queue;
 
-mod task_state;
 mod tick;
 
 use crate::syscall;
