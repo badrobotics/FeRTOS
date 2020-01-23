@@ -16,6 +16,14 @@ svc_handler:
     PUSH {R4, R5, LR}
 
     //////////////////////////////
+    //Load the parameters
+    //////////////////////////////
+    LDR R0, [SP, 0xC]
+    LDR R1, [SP, 0x10]
+    LDR R2, [SP, 0x14]
+    LDR R3, [SP, 0x18]
+
+    //////////////////////////////
     //Retrieve the syscall number
     //////////////////////////////
 
