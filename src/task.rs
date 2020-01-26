@@ -1,16 +1,17 @@
 extern crate alloc;
 extern crate crossbeam_queue;
 
+mod task_state;
 mod tick;
 
 use crate::syscall;
+use crate::task::task_state::{TaskState, TaskStateStruct};
 use crate::task::tick::TickCounter;
 use alloc::collections::LinkedList;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 use crossbeam_queue::SegQueue;
 use fe_osi;
@@ -21,14 +22,6 @@ union StackPtr {
     reference: &'static u32,
     ptr: *const u32,
     num: u32,
-}
-
-#[derive(Clone, Copy)]
-enum TaskState {
-    Runnable,
-    Asleep(u64),
-    Blocking(*const Semaphore),
-    Zombie,
 }
 
 #[repr(C)]
@@ -43,7 +36,7 @@ pub (crate) struct Task {
     //Stores the param of the task if it was created with the task_spawn syscall
     //This will be a raw pointer to a Box that will need to be freed
     task_info: Option<Box<NewTaskInfo>>,
-    state: RefCell<TaskState>,
+    state: TaskStateStruct,
     queued: AtomicBool,
 }
 
@@ -65,7 +58,7 @@ static mut PLACEHOLDER_TASK: Task = Task {
     sp: StackPtr { num: 0 },
     dynamic_stack: Vec::new(),
     task_info: None,
-    state: RefCell::new(TaskState::Runnable),
+    state: TaskStateStruct::new(),
     queued: AtomicBool::new(false),
 };
 static mut KERNEL_TASK: &Task = unsafe { &PLACEHOLDER_TASK };
@@ -107,11 +100,16 @@ unsafe fn scheduler() {
     //Find the next task to run if there is one
     match SCHEDULER_QUEUE.pop() {
         Ok(task) => {
-            match *task.state.borrow() {
+            let task_state = task.state.try_get().unwrap_or(TaskState::Ignore);
+
+            match task_state {
                 TaskState::Runnable => {
                     NEXT_TASK = &task;
                 },
                 _ => {
+                    //If the popped task is not runnable, we should still signal that
+                    //it is no longer queud
+                    task.queued.store(false, Ordering::SeqCst);
                     NEXT_TASK = KERNEL_TASK;
                 },
             }
@@ -138,20 +136,24 @@ pub unsafe extern "C" fn sys_tick() {
 
 //Puts the currently running thread to sleep for at least the specified number
 //of ticks
-pub (crate) fn sleep(sleep_ticks: u64) {
+pub (crate) fn sleep(sleep_ticks: u64) -> bool{
     unsafe {
-        CUR_TASK.state.replace(TaskState::Asleep(TICKS.get() + sleep_ticks));
+        let ret_val = CUR_TASK.state.try_set(TaskState::Asleep(TICKS.get() + sleep_ticks));
         //Trigger a context switch and wait until that happens
         do_context_switch();
+
+        ret_val
     }
 }
 
 //Has the currently running thread block until the semaphore it's blocking on
 //is available
-pub (crate) fn block(sem: *const Semaphore) {
+pub (crate) fn block(sem: *const Semaphore) -> bool{
     unsafe {
-        CUR_TASK.state.replace(TaskState::Blocking(sem));
+        let ret_val = CUR_TASK.state.try_set(TaskState::Blocking(sem));
         do_context_switch();
+
+        ret_val
     }
 }
 
@@ -183,7 +185,7 @@ pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
         task_info: None,
-        state: RefCell::new(TaskState::Runnable),
+        state: TaskStateStruct::new(),
         queued: AtomicBool::new(false),
     };
 
@@ -206,7 +208,7 @@ pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize
         sp: StackPtr { reference: stack_ptr, },
         dynamic_stack: Vec::new(),
         task_info: None,
-        state: RefCell::new(TaskState::Runnable),
+        state: TaskStateStruct::new(),
         queued: AtomicBool::new(false),
     };
 
@@ -243,9 +245,11 @@ pub (crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
     loop{}
 }
 
-pub (crate) unsafe fn remove_task() {
-    CUR_TASK.state.replace(TaskState::Zombie);
+pub (crate) unsafe fn remove_task() -> bool {
+    let ret_val = CUR_TASK.state.try_set(TaskState::Zombie);
     do_context_switch();
+
+    ret_val
 }
 
 pub fn start_scheduler(
@@ -297,7 +301,7 @@ fn kernel(_: &mut u32) {
         for task in task_list.iter() {
             let mut new_state = TaskState::Runnable;
             let mut has_new_state = false;
-            let task_state = *task.state.borrow();
+            let task_state = task.state.try_get().unwrap_or(TaskState::Ignore);
 
             match task_state {
                 TaskState::Runnable => {
@@ -330,11 +334,13 @@ fn kernel(_: &mut u32) {
                     delete_task = true;
                     deleted_task_num = task_num;
                     continue;
-                }
+                },
+                TaskState::Ignore => {},
             }
 
             if has_new_state {
-                task.state.replace(new_state);
+                //If this fails, the kernel will just take care of it in the next run through
+                task.state.try_set(new_state);
             }
 
             task_num += 1;
