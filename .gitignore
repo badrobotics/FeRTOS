@@ -1,5 +1,5 @@
-/target
+*/target
 **/*.rs.bk
 *.out
 *.swp
-Cargo.lock
+*/Cargo.lock

@@ -5,7 +5,7 @@ authors = ["Bijan Tabatabai <bijan311@yahoo.com>"]
 edition = "2018"
 
 [dependencies]
-fe_osi = { git = "https://github.com/badrobotics/fe_osi" }
+fe_osi = { path = "../fe_osi" }
 cortex-m = "0.6"
 
 [dependencies.crossbeam-queue]

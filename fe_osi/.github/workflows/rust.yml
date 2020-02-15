@@ -21,10 +21,7 @@ jobs:
       
     - name: Build Cortex-M3
       run: cargo build --verbose --target=thumbv7m-none-eabi
-      working-directory: ./fe_rtos
     - name: Build Cortex-M4, M7
       run: cargo build --verbose --target=thumbv7em-none-eabi
-      working-directory: ./fe_rtos
     - name: Build Cortex-M4F, M7F
       run: cargo build --verbose --target=thumbv7em-none-eabihf
-      working-directory: ./fe_rtos
