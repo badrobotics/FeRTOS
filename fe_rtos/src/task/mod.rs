@@ -49,7 +49,7 @@ pub (crate) struct NewTaskInfo {
 }
 
 const INIT_XPSR: u32 = 0x01000000;
-pub const DEFAULT_STACK_SIZE: usize = 512;
+pub const DEFAULT_STACK_SIZE: usize = 1024;
 
 static mut KERNEL_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
@@ -61,8 +61,8 @@ static mut PLACEHOLDER_TASK: Task = Task {
     state: TaskStateStruct::new(),
     queued: AtomicBool::new(false),
 };
-static mut KERNEL_TASK: &Task = unsafe { &PLACEHOLDER_TASK };
-static mut NEXT_TASK: &Task = unsafe { &PLACEHOLDER_TASK };
+static mut KERNEL_TASK: Option<Arc<Task>> = None;
+static mut NEXT_TASK: Option<Arc<Task>> = None;
 static mut CUR_TASK: &mut Task = unsafe { &mut PLACEHOLDER_TASK };
 lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = { SegQueue::new() };
@@ -83,17 +83,26 @@ pub (crate) unsafe extern "C" fn get_cur_task() -> &'static Task {
 #[no_mangle]
 pub (crate) unsafe extern "C" fn set_cur_task(new_val: &'static mut Task) {
     CUR_TASK = new_val;
-} 
+}
 
 #[no_mangle]
 pub (crate) unsafe extern "C" fn get_next_task() -> &'static Task {
-    NEXT_TASK
+    match &NEXT_TASK {
+        Some(task) => task,
+        None => &PLACEHOLDER_TASK,
+    }
 }
 
 unsafe fn scheduler() {
+    let default_task = match &KERNEL_TASK {
+        Some(task) => Arc::clone(&task),
+        //The code should never get here
+        None => panic!("No valid KERNEL_TASK in scheduler"),
+    };
+
     //If a task is being currently being pushed by the kernel, run it so it can finish
     if PUSHING_TASK.load(Ordering::SeqCst) {
-        NEXT_TASK = KERNEL_TASK;
+        NEXT_TASK = Some(Arc::clone(&default_task));
         return;
     }
 
@@ -104,22 +113,30 @@ unsafe fn scheduler() {
 
             match task_state {
                 TaskState::Runnable => {
-                    NEXT_TASK = &task;
+                    NEXT_TASK = Some(Arc::clone(&task));
                 },
                 _ => {
                     //If the popped task is not runnable, we should still signal that
                     //it is no longer queud
                     task.queued.store(false, Ordering::SeqCst);
-                    NEXT_TASK = KERNEL_TASK;
+                    NEXT_TASK = Some(Arc::clone(&default_task));
                 },
             }
         },
         Err(_) => {
-            NEXT_TASK = KERNEL_TASK;
+            NEXT_TASK = Some(Arc::clone(&default_task));
         },
     }
 
-    NEXT_TASK.queued.store(false, Ordering::SeqCst);
+    match &NEXT_TASK {
+        Some(task) => {
+            task.queued.store(false, Ordering::SeqCst);
+        },
+        //The code shouldn't get here
+        None => {
+            panic!("No valid NEXT_TASK at the end of scheduling");
+        },
+    }
 }
 
 unsafe fn do_context_switch() {
@@ -263,7 +280,7 @@ pub fn start_scheduler(
         let kernel_task_ref = add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel as *const u32, None);
         //Add something to the scheduler queue so something can run right away
         kernel_task_ref.queued.store(true, Ordering::SeqCst);
-        KERNEL_TASK = &kernel_task_ref;
+        KERNEL_TASK = Some(Arc::clone(&kernel_task_ref));
         SCHEDULER_QUEUE.push(kernel_task_ref);
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
@@ -309,6 +326,10 @@ fn kernel(_: &mut u32) {
                         PUSHING_TASK.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
                         PUSHING_TASK.store(false, Ordering::SeqCst);
+                    } else if SCHEDULER_QUEUE.is_empty() {
+                        //If the task is marked as queued, but the queue is empty,
+                        //unmark it as queued.
+                        task.queued.store(false, Ordering::SeqCst);
                     }
                 },
                 TaskState::Asleep(wake_up_ticks) => {
