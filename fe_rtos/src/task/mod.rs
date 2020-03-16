@@ -134,7 +134,7 @@ unsafe fn scheduler() {
         },
         //The code shouldn't get here
         None => {
-            panic!("No valid NEXT_TEXT at the end of scheduling");
+            panic!("No valid NEXT_TASK at the end of scheduling");
         },
     }
 }
