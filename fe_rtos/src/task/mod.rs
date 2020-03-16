@@ -111,30 +111,18 @@ unsafe fn scheduler() {
         Ok(task) => {
             let task_state = task.state.try_get().unwrap_or(TaskState::Ignore);
 
+            task.queued.store(false, Ordering::SeqCst);
             match task_state {
                 TaskState::Runnable => {
                     NEXT_TASK = Some(Arc::clone(&task));
                 },
                 _ => {
-                    //If the popped task is not runnable, we should still signal that
-                    //it is no longer queud
-                    task.queued.store(false, Ordering::SeqCst);
                     NEXT_TASK = Some(Arc::clone(&default_task));
                 },
             }
         },
         Err(_) => {
             NEXT_TASK = Some(Arc::clone(&default_task));
-        },
-    }
-
-    match &NEXT_TASK {
-        Some(task) => {
-            task.queued.store(false, Ordering::SeqCst);
-        },
-        //The code shouldn't get here
-        None => {
-            panic!("No valid NEXT_TASK at the end of scheduling");
         },
     }
 }
@@ -326,10 +314,6 @@ fn kernel(_: &mut u32) {
                         PUSHING_TASK.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
                         PUSHING_TASK.store(false, Ordering::SeqCst);
-                    } else if SCHEDULER_QUEUE.is_empty() {
-                        //If the task is marked as queued, but the queue is empty,
-                        //unmark it as queued.
-                        task.queued.store(false, Ordering::SeqCst);
                     }
                 },
                 TaskState::Asleep(wake_up_ticks) => {
