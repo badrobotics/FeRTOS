@@ -49,7 +49,7 @@ pub (crate) struct NewTaskInfo {
 }
 
 const INIT_XPSR: u32 = 0x01000000;
-pub const DEFAULT_STACK_SIZE: usize = 512;
+pub const DEFAULT_STACK_SIZE: usize = 1024;
 
 static mut KERNEL_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
