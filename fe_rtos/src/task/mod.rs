@@ -338,7 +338,6 @@ fn kernel(_: &mut u32) {
                 TaskState::Zombie => {
                     delete_task = true;
                     deleted_task_num = task_num;
-                    continue;
                 },
                 TaskState::Ignore => {},
             }
