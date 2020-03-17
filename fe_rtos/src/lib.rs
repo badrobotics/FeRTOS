@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(const_mut_refs)]
+#![feature(linked_list_remove)]
 
 #[macro_use]
 extern crate lazy_static;

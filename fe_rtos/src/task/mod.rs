@@ -352,26 +352,19 @@ fn kernel(_: &mut u32) {
 
         //Delete a task if there's a task to be deleted
         if delete_task {
-            let mut split_list = task_list.split_off(deleted_task_num);
+            //If this task has been removed, remove it from the list
+            //and rust will dealloc almost eveything
+            let removed_task = task_list.remove(deleted_task_num);
 
-            match split_list.pop_front() {
-                Some(task) => {
-                    //If this task has been removed, remove it from the list
-                    //and rust will dealloc everything
-                    match &task.task_info {
-                        Some(info) => {
-                            if !info.param.is_null() {
-                                unsafe { core::mem::drop(Box::from_raw(info.param)); }
-                            }
-                        },
-                        None => (),
+            //We still need to manually dealloc the parameter though
+            match &removed_task.task_info {
+                Some(info) => {
+                    if !info.param.is_null() {
+                        unsafe { core::mem::drop(Box::from_raw(info.param)); }
                     }
                 },
                 None => (),
             }
-
-            //Put the task list back together
-            task_list.append(&mut split_list);
         }
 
         //Going through the loop multiple times without anything else running is
