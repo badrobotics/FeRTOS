@@ -15,14 +15,14 @@ impl Semaphore {
     pub const fn new(start_count: usize) -> Semaphore {
         Semaphore {
             count: AtomicUsize::new(start_count),
-            mutex: false
+            mutex: false,
         }
     }
 
     pub const fn new_mutex() -> Semaphore {
         Semaphore {
             count: AtomicUsize::new(1),
-            mutex: true
+            mutex: true,
         }
     }
 
@@ -40,13 +40,15 @@ impl Semaphore {
 
             //If we cannot take the semaphore, block until we maybe can
             if old_val == 0 {
-                unsafe {
-                    do_block(self as *const Semaphore);
-                }
+                unsafe { while do_block(self as *const Semaphore) != 0 {} }
                 continue;
             }
 
-            if self.count.compare_and_swap(old_val, old_val - 1, Ordering::SeqCst) == old_val {
+            if self
+                .count
+                .compare_and_swap(old_val, old_val - 1, Ordering::SeqCst)
+                == old_val
+            {
                 break;
             }
         }

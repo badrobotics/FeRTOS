@@ -7,6 +7,9 @@
     .global do_block
     .global do_task_spawn
     .global do_yield
+    .global publish_to_topic
+    .global subscribe_to_topic
+    .global get_message_topic
 
     .thumb_func
 do_exit:
@@ -48,4 +51,22 @@ do_task_spawn:
 do_yield:
     PUSH { LR }
     svc 0x6
+    POP { PC }
+
+    .thumb_func
+publish_to_topic:
+    PUSH { LR }
+    svc 0x7
+    POP { PC }
+
+    .thumb_func
+subscribe_to_topic:
+    PUSH { LR }
+    svc 0x8
+    POP { PC }
+
+    .thumb_func
+get_message_topic:
+    PUSH { LR }
+    svc 0x9
     POP { PC }
