@@ -4,9 +4,9 @@ use alloc::vec::Vec;
 use cstr_core::CString;
 
 extern "C" {
-    fn publish_to_topic(topic: *const u8, message: Message);
-    fn subscribe_to_topic(topic: *const u8);
-    fn get_message_topic(topic: *const u8) -> Message;
+    fn ipc_publish(topic: *const u8, message: Message);
+    fn ipc_subscribe(topic: *const u8);
+    fn ipc_get_message(topic: *const u8) -> Message;
 }
 
 #[repr(C)]
@@ -45,7 +45,7 @@ impl Publisher {
     pub fn publish(&mut self, message: Vec<u8>) {
         let c_msg: Message = message.into();
         unsafe {
-            publish_to_topic(self.topic.as_ptr(), c_msg);
+            ipc_publish(self.topic.as_ptr(), c_msg);
         }
     }
 }
@@ -58,12 +58,12 @@ impl<'a> Subscriber {
     pub fn new(&mut self, topic: String) -> Self {
         let c_topic = CString::new(topic).unwrap();
         unsafe {
-            subscribe_to_topic(c_topic.as_ptr());
+            ipc_subscribe(c_topic.as_ptr());
         }
         Subscriber { topic: c_topic }
     }
 
     pub fn get_message(&mut self) -> Vec<u8> {
-        unsafe { get_message_topic(self.topic.as_ptr()).into() }
+        unsafe { ipc_get_message(self.topic.as_ptr()).into() }
     }
 }

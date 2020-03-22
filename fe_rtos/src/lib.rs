@@ -10,6 +10,7 @@ mod fe_alloc;
 pub mod task;
 pub mod syscall;
 pub mod interrupt;
+pub mod ipc;
 
 use fe_alloc::KernelAllocator;
 

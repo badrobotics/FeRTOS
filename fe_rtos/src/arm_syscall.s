@@ -7,9 +7,11 @@
     .weak sys_block
     .weak sys_task_spawn
     .weak sys_yield
+    .weak sys_ipc_publish
+    .weak sys_ipc_subscribe
+    .weak sys_ipc_get_message
     .global svc_handler
-
-.equ max_svc, 6
+.equ max_svc, 9
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arm Cortex-M interrupt stack frame order:
@@ -62,12 +64,12 @@ svc_handler:
     //The new PC in the ISR stackframe is where we're jumping to
     STR R0, [SP, 0x18]
 
-    .thumb_func
 svc_handler_end:
     BX LR
 
 .align 4
 svc_addr_table:
+<<<<<<< HEAD
     .word sys_exit       // 0
     .word sys_sleep      // 1
     .word sys_alloc      // 2
@@ -75,3 +77,14 @@ svc_addr_table:
     .word sys_block      // 4
     .word sys_task_spawn // 5
     .word sys_yield      // 6
+=======
+    .word sys_exit            // 0
+    .word sys_sleep           // 1
+    .word sys_alloc           // 2
+    .word sys_dealloc         // 3
+    .word sys_block           // 4
+    .word sys_task_spawn      // 5
+    .word sys_ipc_publish     // 6
+    .word sys_ipc_subscribe   // 7
+    .word sys_ipc_get_message // 8
+>>>>>>> changing syscall names. added topic registery
