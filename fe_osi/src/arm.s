@@ -9,30 +9,36 @@
 
     .thumb_func
 do_exit:
+    PUSH { LR }
     svc 0x0
-    BX LR
+    POP { PC }
 
     .thumb_func
 do_sleep:
+    PUSH { LR }
     svc 0x1
-    BX LR
+    POP { PC }
 
     .thumb_func
 do_alloc:
+    PUSH { LR }
     svc 0x2
-    BX LR
+    POP { PC }
 
     .thumb_func
 do_dealloc:
+    PUSH { LR }
     svc 0x3
-    BX LR
+    POP { PC }
 
     .thumb_func
 do_block:
+    PUSH { LR }
     svc 0x4
-    BX LR
+    POP { PC }
 
     .thumb_func
 do_task_spawn:
+    PUSH { LR }
     svc 0x5
-    BX LR
+    POP { PC }
