@@ -109,7 +109,9 @@ unsafe fn scheduler() {
     //Find the next task to run if there is one
     match SCHEDULER_QUEUE.pop() {
         Ok(task) => {
-            let task_state = task.state.try_get().unwrap_or(TaskState::Ignore);
+            //We want to default to Runnable because if a task is in a transition state,
+            //it should be scheduled so it can finish transitioning.
+            let task_state = task.state.try_get().unwrap_or(TaskState::Runnable);
 
             task.queued.store(false, Ordering::SeqCst);
             match task_state {
@@ -306,7 +308,9 @@ fn kernel(_: &mut u32) {
         for task in task_list.iter() {
             let mut new_state = TaskState::Runnable;
             let mut has_new_state = false;
-            let task_state = task.state.try_get().unwrap_or(TaskState::Ignore);
+            //We want to default to Runnable because if a task is in a transition state,
+            //it should be scheduled so it can finish transitioning.
+            let task_state = task.state.try_get().unwrap_or(TaskState::Runnable);
 
             match task_state {
                 TaskState::Runnable => {
@@ -339,7 +343,6 @@ fn kernel(_: &mut u32) {
                     delete_task = true;
                     deleted_task_num = task_num;
                 },
-                TaskState::Ignore => {},
             }
 
             if has_new_state {

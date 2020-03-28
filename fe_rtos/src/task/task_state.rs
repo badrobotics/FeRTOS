@@ -8,7 +8,6 @@ pub enum TaskState {
     Asleep(u64),
     Blocking(*const Semaphore),
     Zombie,
-    Ignore,
 }
 
 pub struct TaskStateStruct {
