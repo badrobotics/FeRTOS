@@ -6,9 +6,10 @@
     .weak sys_dealloc
     .weak sys_block
     .weak sys_task_spawn
+    .weak sys_yield
     .global svc_handler
 
-.equ max_svc, 5
+.equ max_svc, 6
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arm Cortex-M interrupt stack frame order:
@@ -73,3 +74,4 @@ svc_addr_table:
     .word sys_dealloc    // 3
     .word sys_block      // 4
     .word sys_task_spawn // 5
+    .word sys_yield      // 6

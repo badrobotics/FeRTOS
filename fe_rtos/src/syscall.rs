@@ -68,3 +68,10 @@ extern "C" fn sys_task_spawn(stack_size: usize, entry_point: *const u32, paramet
 
     0
 }
+
+#[no_mangle]
+extern "C" fn sys_yield() -> usize {
+    unsafe { task::do_context_switch(); }
+
+    0
+}
