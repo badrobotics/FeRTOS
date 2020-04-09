@@ -13,7 +13,7 @@ extern "C" {
 
 pub fn exit() -> usize {
     unsafe {
-        while do_exit() != 0 {}
+        do_exit();
     }
     //Execution should never reach here
     loop {}
@@ -21,7 +21,7 @@ pub fn exit() -> usize {
 
 pub fn sleep(ms: u32) -> usize {
     unsafe {
-        while do_sleep(ms) != 0 {}
+        do_sleep(ms);
     }
 
     0

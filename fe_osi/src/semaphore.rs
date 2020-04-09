@@ -41,7 +41,7 @@ impl Semaphore {
             //If we cannot take the semaphore, block until we maybe can
             if old_val == 0 {
                 unsafe {
-                    while do_block(self as *const Semaphore) != 0 {}
+                    do_block(self as *const Semaphore);
                 }
                 continue;
             }
