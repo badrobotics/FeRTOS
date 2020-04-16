@@ -129,7 +129,7 @@ unsafe fn scheduler() {
     }
 }
 
-unsafe fn do_context_switch() {
+pub (crate) unsafe fn do_context_switch() {
     super::disable_interrupts();
     scheduler();
     super::enable_interrupts();

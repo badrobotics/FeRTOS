@@ -6,6 +6,7 @@
     .global do_dealloc
     .global do_block
     .global do_task_spawn
+    .global do_yield
 
     .thumb_func
 do_exit:
@@ -41,4 +42,10 @@ do_block:
 do_task_spawn:
     PUSH { LR }
     svc 0x5
+    POP { PC }
+
+    .thumb_func
+do_yield:
+    PUSH { LR }
+    svc 0x6
     POP { PC }
