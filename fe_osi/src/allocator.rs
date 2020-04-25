@@ -5,7 +5,7 @@ pub struct FeAllocator;
 #[repr(C)]
 pub struct LayoutFFI {
     pub size: usize,
-    pub align: usize,
+    pub align: usize
 }
 
 extern "C" {
@@ -17,7 +17,7 @@ unsafe impl GlobalAlloc for FeAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let layout_ffi: LayoutFFI = LayoutFFI {
             size: layout.size(),
-            align: layout.align(),
+            align: layout.align()
         };
         do_alloc(layout_ffi)
     }
@@ -25,7 +25,7 @@ unsafe impl GlobalAlloc for FeAllocator {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let layout_ffi: LayoutFFI = LayoutFFI {
             size: layout.size(),
-            align: layout.align(),
+            align: layout.align()
         };
         do_dealloc(ptr, layout_ffi);
     }

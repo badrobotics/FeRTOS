@@ -31,7 +31,7 @@ impl TopicRegistry {
             self.lock.take();
             let msg_vec: Vec<u8> = message.into();
             for topic in &mut TOPIC_REGISTERY.topic_lookup {
-                if topic.name == message_topic {
+                if topic.name.trim() == message_topic.trim() {
                     let msg_clone = msg_vec.clone();
                     topic.data.push(msg_clone);
                     for subscriber in &mut topic.subscribers {
@@ -48,18 +48,19 @@ impl TopicRegistry {
             self.lock.take();
             let mut topic_exists = false;
             for topic in &mut TOPIC_REGISTERY.topic_lookup {
-                if topic.name == subscriber_topic {
+                if topic.name.trim() == subscriber_topic.trim() {
                     topic_exists = true;
                     let subscriber = Subscriber {
                         lock: sem,
                         index: topic.data.len(),
                     };
+                    (*(subscriber.lock)).take();
                     topic.subscribers.push(subscriber);
                 }
             }
             if !topic_exists {
                 let mut new_topic = Topic {
-                    name: subscriber_topic,
+                    name: subscriber_topic.clone(),
                     data: Vec::new(),
                     subscribers: Vec::new(),
                 };
@@ -67,6 +68,7 @@ impl TopicRegistry {
                     lock: sem,
                     index: 0,
                 };
+                (*(subscriber.lock)).take();
                 new_topic.subscribers.push(subscriber);
                 TOPIC_REGISTERY.topic_lookup.push(new_topic);
             }

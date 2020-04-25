@@ -1,6 +1,5 @@
 extern crate alloc;
 use crate::semaphore::Semaphore;
-use alloc::string::String;
 use alloc::vec::Vec;
 use cstr_core::CString;
 
@@ -38,7 +37,7 @@ pub struct Publisher {
 }
 
 impl Publisher {
-    pub fn new(topic: String) -> Self {
+    pub fn new(topic: &str) -> Self {
         let c_topic = CString::new(topic).unwrap();
         Publisher { topic: c_topic }
     }
@@ -57,27 +56,23 @@ pub struct Subscriber {
 }
 
 impl<'a> Subscriber {
-    pub fn new(&mut self, topic: String) -> Self {
+    pub fn new(topic: &str) -> Self {
         let c_topic: CString = CString::new(topic).unwrap();
         let subscriber = Subscriber {
             topic: c_topic,
             sem: Semaphore::new_mutex(),
         };
         unsafe {
-            ipc_subscribe(self.topic.as_ptr(), &self.sem);
+            ipc_subscribe(subscriber.topic.as_ptr(), &subscriber.sem);
         }
         subscriber
     }
 
-    pub fn get_message(&mut self) -> Option<Vec<u8>> {
-        if self.sem.is_available() {
-            let message: Message;
-            unsafe {
-                message = ipc_get_message(self.topic.as_ptr(), &self.sem);
-            };
-            Some(message.into())
-        } else {
-            None
-        }
+    pub fn get_message(&mut self) -> Vec<u8> {
+        let message: Message;
+        unsafe {
+            message = ipc_get_message(self.topic.as_ptr(), &self.sem);
+        };
+        message.into()
     }
 }
