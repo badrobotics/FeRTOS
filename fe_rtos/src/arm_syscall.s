@@ -69,22 +69,13 @@ svc_handler_end:
 
 .align 4
 svc_addr_table:
-<<<<<<< HEAD
-    .word sys_exit       // 0
-    .word sys_sleep      // 1
-    .word sys_alloc      // 2
-    .word sys_dealloc    // 3
-    .word sys_block      // 4
-    .word sys_task_spawn // 5
-    .word sys_yield      // 6
-=======
     .word sys_exit            // 0
     .word sys_sleep           // 1
     .word sys_alloc           // 2
     .word sys_dealloc         // 3
     .word sys_block           // 4
     .word sys_task_spawn      // 5
-    .word sys_ipc_publish     // 6
-    .word sys_ipc_subscribe   // 7
-    .word sys_ipc_get_message // 8
->>>>>>> changing syscall names. added topic registery
+    .word sys_yield           // 6
+    .word sys_ipc_publish     // 7
+    .word sys_ipc_subscribe   // 8
+    .word sys_ipc_get_message // 9

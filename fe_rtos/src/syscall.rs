@@ -1,16 +1,13 @@
 extern crate alloc;
 
 use crate::fe_alloc;
-use crate::ipc::IPCMessage;
 use crate::task;
-use crate::task::NEW_MESSAGE_QUEUE;
+use crate::ipc;
 use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
-use cstr_core::CString;
 use fe_osi::allocator::LayoutFFI;
-use fe_osi::ipc::Message;
 use fe_osi::semaphore::Semaphore;
+use fe_osi::ipc::Message;
+use cstr_core::CString;
 
 extern "C" {
     pub fn svc_handler();
@@ -96,20 +93,33 @@ extern "C" fn sys_yield() -> usize {
     0
 }
 
-extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) {
-    let topic: String;
+#[no_mangle]
+extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) -> usize{
     unsafe {
-        topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        ipc::TOPIC_REGISTERY.publish_to_topic(topic, message);
     }
-    let msg = IPCMessage {
-        topic: topic,
-        data: message.into(),
-    };
-    NEW_MESSAGE_QUEUE.push(msg);
+
+    0
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_subscribe(topic: *const u8) {}
+extern "C" fn sys_ipc_subscribe(c_topic: *const u8, sem: *const Semaphore) -> usize{
+    unsafe {
+        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem);
+    }
 
-//#[no_mangle]
-//extern "C" fn sys_ipc_get_message(topic: *const u8) -> Message { }
+    0
+}
+
+#[no_mangle]
+extern "C" fn sys_ipc_get_message(c_topic: *const u8, sem: *const Semaphore) -> Message { 
+    unsafe {
+        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        (*sem).take();
+        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic, sem).unwrap();
+        (*sem).give();
+        return msg;
+    }
+}

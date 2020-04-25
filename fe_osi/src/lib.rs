@@ -24,3 +24,11 @@ pub fn sleep(ms: u32) -> usize {
 
     0
 }
+
+pub fn r#yield() -> usize {
+    unsafe {
+        do_yield();
+    }
+
+    0
+}

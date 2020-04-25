@@ -7,7 +7,6 @@ mod tick;
 use crate::syscall;
 use crate::task::task_state::{TaskState, TaskStateStruct};
 use crate::task::tick::TickCounter;
-use crate::ipc::{TopicRegistery, IPCMessage};
 use alloc::collections::LinkedList;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
@@ -70,7 +69,6 @@ static mut CUR_TASK: &mut Task = unsafe { &mut PLACEHOLDER_TASK };
 lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = { SegQueue::new() };
     static ref SCHEDULER_QUEUE: SegQueue<Arc<Task>> = { SegQueue::new() };
-    pub (crate) static ref NEW_MESSAGE_QUEUE: SegQueue<IPCMessage> = { SegQueue::new() };
 }
 
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
@@ -302,7 +300,6 @@ pub fn start_scheduler(
 
 fn kernel(_: &mut u32) {
     let mut task_list: LinkedList<Arc<Task>> = LinkedList::new();
-    let mut ipc_registery = TopicRegistery::new();
 
     loop {
         let mut task_num: usize = 0;
@@ -380,12 +377,6 @@ fn kernel(_: &mut u32) {
                 },
                 None => (),
             }
-        }
-
-        // add new messages to ipc table
-        while !NEW_MESSAGE_QUEUE.is_empty() {
-            let message = NEW_MESSAGE_QUEUE.pop().unwrap(); 
-            ipc_registery.publish_to_topic(message.topic, message.data);
         }
 
         //Going through the loop multiple times without anything else running is
