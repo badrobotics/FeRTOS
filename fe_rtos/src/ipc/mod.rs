@@ -25,7 +25,7 @@ impl TopicRegistry {
             if topic.name == message_topic {
                 topic.data.push(message.clone());
                 for subscriber in &mut topic.subscribers {
-                    subscriber.lock.give();
+                    subscriber.set_available();
                 }
             }
         }
@@ -40,10 +40,11 @@ impl TopicRegistry {
         for topic in &mut self.topic_lookup {
             if topic.name == subscriber_topic {
                 topic_exists = true;
-                let subscriber = Subscriber::new(sem, Some(topic.data.len()));
+                let mut subscriber = Subscriber::new(sem, Some(topic.data.len()));
 
                 // take the condition variable to indicate no new messages
-                subscriber.lock.take();
+                subscriber.set_unavailable();
+
                 topic.subscribers.push(subscriber);
             }
         }
@@ -53,9 +54,10 @@ impl TopicRegistry {
             let mut new_topic = Topic::new(&subscriber_topic);
 
             // create a subscriber to add to it
-            let subscriber = Subscriber::new(sem, None);
+            let mut subscriber = Subscriber::new(sem, None);
+
             // take the lock
-            subscriber.lock.take();
+            subscriber.set_unavailable();
 
             // add subscriber to topic subscriber list
             new_topic.subscribers.push(subscriber);

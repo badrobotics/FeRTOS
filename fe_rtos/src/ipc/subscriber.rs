@@ -16,4 +16,12 @@ impl Subscriber {
             index: start_index,
         }
     }
+
+    pub(crate) fn set_unavailable(&mut self) {
+        self.lock.take();
+    }
+
+    pub(crate) fn set_available(&mut self) {
+        self.lock.give();
+    }
 }
