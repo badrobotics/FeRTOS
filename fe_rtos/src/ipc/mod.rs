@@ -1,12 +1,12 @@
+mod subscriber;
+mod topic;
+
 extern crate alloc;
+use crate::ipc::subscriber::Subscriber;
+use crate::ipc::topic::Topic;
 use alloc::string::String;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
-
-pub(crate) struct Subscriber {
-    lock: &'static Semaphore,
-    index: usize,
-}
 
 pub(crate) struct TopicRegistry {
     pub(crate) lock: Semaphore,
@@ -17,12 +17,6 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
     lock: Semaphore::new_mutex(),
     topic_lookup: Vec::new(),
 };
-
-pub(crate) struct Topic {
-    name: String,
-    data: Vec<Vec<u8>>,
-    subscribers: Vec<Subscriber>,
-}
 
 impl TopicRegistry {
     pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
@@ -40,29 +34,30 @@ impl TopicRegistry {
 
     pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: &'static Semaphore) {
         self.lock.take();
+
+        // If the topic already exists in the registery, add a new subscriber
         let mut topic_exists = false;
         for topic in &mut self.topic_lookup {
             if topic.name == subscriber_topic {
                 topic_exists = true;
-                let subscriber = Subscriber {
-                    lock: sem,
-                    index: topic.data.len(),
-                };
+                let subscriber = Subscriber::new(sem, Some(topic.data.len()));
+
+                // take the condition variable to indicate no new messages
                 subscriber.lock.take();
                 topic.subscribers.push(subscriber);
             }
         }
+        // If the topic already exists in the registery, add a new subscriber
         if !topic_exists {
-            let mut new_topic = Topic {
-                name: subscriber_topic.clone(),
-                data: Vec::new(),
-                subscribers: Vec::new(),
-            };
-            let subscriber = Subscriber {
-                lock: sem,
-                index: 0,
-            };
+            // create the new topic
+            let mut new_topic = Topic::new(&subscriber_topic);
+
+            // create a subscriber to add to it
+            let subscriber = Subscriber::new(sem, None);
+            // take the lock
             subscriber.lock.take();
+
+            // add subscriber to topic subscriber list
             new_topic.subscribers.push(subscriber);
             self.topic_lookup.push(new_topic);
         }
