@@ -97,7 +97,7 @@ extern "C" fn sys_yield() -> usize {
 extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) -> usize{
     unsafe {
         let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
-        ipc::TOPIC_REGISTERY.publish_to_topic(topic, message);
+        ipc::TOPIC_REGISTERY.publish_to_topic(topic, &(message.into()));
     }
 
     0
@@ -122,6 +122,6 @@ extern "C" fn sys_ipc_get_message(c_topic: *const u8, sem: *const Semaphore) -> 
         sem_ref.take();
         let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic, sem_ref).unwrap();
         sem_ref.give();
-        return msg;
+        return msg.into();
     }
 }
