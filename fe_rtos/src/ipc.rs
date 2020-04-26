@@ -82,7 +82,6 @@ impl TopicRegistry {
         sem: *const Semaphore,
     ) -> Option<Message> {
         unsafe {
-            self.lock.take();
             for topic in &mut TOPIC_REGISTERY.topic_lookup {
                 if topic.name == msg_topic {
                     for subscriber in &mut topic.subscribers {
@@ -90,13 +89,11 @@ impl TopicRegistry {
                             let msg_vec: Vec<u8> = topic.data[subscriber.index].clone();
                             //increment place
                             subscriber.index += 1;
-                            self.lock.give();
                             return Some(msg_vec.into());
                         }
                     }
                 }
             }
-            self.lock.give();
             return None;
         }
     }
