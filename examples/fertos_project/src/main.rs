@@ -5,8 +5,6 @@ mod cmd;
 mod uart_server;
 mod stdio;
 
-#[macro_use]
-extern crate lazy_static;
 extern crate alloc;
 
 use alloc::boxed::Box;
@@ -65,7 +63,7 @@ fn main() -> ! {
         Some(Box::new(uart0_rx)),
     );
 
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::cmd, None);
+    //fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::cmd, None);
 
     // Start the FeRTOS scheduler
     let reload_val: u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
