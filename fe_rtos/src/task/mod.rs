@@ -12,7 +12,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crossbeam_queue::SegQueue;
 use fe_osi;
 use fe_osi::semaphore::Semaphore;
@@ -38,6 +38,7 @@ pub (crate) struct Task {
     task_info: Option<Box<NewTaskInfo>>,
     state: TaskStateStruct,
     queued: AtomicBool,
+    pid: usize,
 }
 
 unsafe impl Send for Task {}
@@ -60,6 +61,7 @@ static mut PLACEHOLDER_TASK: Task = Task {
     task_info: None,
     state: TaskStateStruct::new(),
     queued: AtomicBool::new(false),
+    pid: 0,
 };
 static mut KERNEL_TASK: Option<Arc<Task>> = None;
 static mut NEXT_TASK: Option<Arc<Task>> = None;
@@ -187,6 +189,11 @@ unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: *const u32, para
     (cur_ptr as u32 + 4) as *const u32
 }
 
+fn get_new_pid() -> usize {
+    static PID: AtomicUsize = AtomicUsize::new(1);
+    return PID.fetch_add(1, Ordering::SeqCst);
+}
+
 pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> Arc<Task> {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
@@ -194,6 +201,7 @@ pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param
         task_info: None,
         state: TaskStateStruct::new(),
         queued: AtomicBool::new(false),
+        pid: get_new_pid(),
     };
 
     //Convert the adress of the first element of the vector into a ptr for the stack
@@ -217,6 +225,7 @@ pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize
         task_info: None,
         state: TaskStateStruct::new(),
         queued: AtomicBool::new(false),
+        pid: get_new_pid(),
     };
 
     //Arm uses a full descending stack so we have to start from the top
