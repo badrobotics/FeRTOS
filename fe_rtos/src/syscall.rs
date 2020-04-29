@@ -104,14 +104,12 @@ extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) -> usize{
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_subscribe(c_topic: *const u8, sem: *const Semaphore) -> usize{
+extern "C" fn sys_ipc_subscribe(c_topic: *const u8) -> *const Semaphore {
+    let sem: Semaphore = Semaphore::new_mutex();
     unsafe {
-        let sem_ref: &'static Semaphore = &*sem;
         let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
-        ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem_ref);
+        ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem)
     }
-
-    0
 }
 
 #[no_mangle]
@@ -119,9 +117,11 @@ extern "C" fn sys_ipc_get_message(c_topic: *const u8, sem: *const Semaphore) -> 
     unsafe {
         let sem_ref: &'static Semaphore = &*sem;
         let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+
         sem_ref.take();
-        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic, sem_ref).unwrap();
+        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic).unwrap();
         sem_ref.give();
-        return msg.into();
+
+        msg.into()
     }
 }

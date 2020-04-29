@@ -5,7 +5,7 @@ use cstr_core::CString;
 
 extern "C" {
     fn ipc_publish(topic: *const u8, message: Message);
-    fn ipc_subscribe(topic: *const u8, sem: *const Semaphore);
+    fn ipc_subscribe(topic: *const u8) -> *const Semaphore;
     fn ipc_get_message(topic: *const u8, sem: *const Semaphore) -> Message;
 }
 
@@ -52,26 +52,25 @@ impl Publisher {
 
 pub struct Subscriber {
     pub topic: CString,
-    sem: Semaphore,
+    sem: *const Semaphore,
 }
 
 impl<'a> Subscriber {
     pub fn new(topic: &str) -> Self {
         let c_topic: CString = CString::new(topic).unwrap();
+        let sem = unsafe { ipc_subscribe(c_topic.as_ptr()) };
+
         let subscriber = Subscriber {
             topic: c_topic,
-            sem: Semaphore::new_mutex(),
+            sem: sem,
         };
-        unsafe {
-            ipc_subscribe(subscriber.topic.as_ptr(), &subscriber.sem);
-        }
         subscriber
     }
 
     pub fn get_message(&mut self) -> Vec<u8> {
         let message: Message;
         unsafe {
-            message = ipc_get_message(self.topic.as_ptr(), &self.sem);
+            message = ipc_get_message(self.topic.as_ptr(), self.sem);
         };
         message.into()
     }

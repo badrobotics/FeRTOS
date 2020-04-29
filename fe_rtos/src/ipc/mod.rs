@@ -7,6 +7,7 @@ use crate::ipc::topic::Topic;
 use alloc::string::String;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
+use crate::task::get_cur_task;
 
 pub(crate) struct TopicRegistry {
     pub(crate) lock: Semaphore,
@@ -19,62 +20,65 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
 };
 
 impl TopicRegistry {
+    fn topic_exists(&mut self, requested_topic: &String) -> bool {
+        for topic in &mut self.topic_lookup {
+            if topic.name == *requested_topic {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn add_topic(&mut self, topic: Topic) {
+        self.topic_lookup.push(topic);
+    }
+
     pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
         self.lock.take();
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
-                topic.data.push(message.clone());
-                for subscriber in &mut topic.subscribers {
-                    subscriber.set_available();
-                }
+                topic.add_message(message);
             }
         }
         self.lock.give();
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: &'static Semaphore) {
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: Semaphore) -> &Semaphore {
+        let pid: usize = unsafe { get_cur_task().pid };
         self.lock.take();
+        let subscriber = Subscriber::new(sem, None);
 
-        // If the topic already exists in the registery, add a new subscriber
-        let mut topic_exists = false;
-        for topic in &mut self.topic_lookup {
-            if topic.name == subscriber_topic {
-                topic_exists = true;
-                let mut subscriber = Subscriber::new(sem, Some(topic.data.len()));
-
-                // take the condition variable to indicate no new messages
-                subscriber.set_unavailable();
-
-                topic.subscribers.push(subscriber);
+        if !self.topic_exists(&subscriber_topic) {
+            let new_topic = Topic::new(&subscriber_topic);
+            self.add_topic(new_topic);
+        }
+        
+        // get reference to desired topic 
+        let topic: &mut Topic = {
+            let mut ret = None;
+            for topic in &mut self.topic_lookup {
+                if topic.name == *subscriber_topic {
+                    ret = Some(topic)
+                }
             }
-        }
-        // If the topic already exists in the registery, add a new subscriber
-        if !topic_exists {
-            // create the new topic
-            let mut new_topic = Topic::new(&subscriber_topic);
+            ret
+        }.unwrap();
 
-            // create a subscriber to add to it
-            let mut subscriber = Subscriber::new(sem, None);
+        topic.add_subscriber(pid, subscriber);
 
-            // take the lock
-            subscriber.set_unavailable();
-
-            // add subscriber to topic subscriber list
-            new_topic.subscribers.push(subscriber);
-            self.topic_lookup.push(new_topic);
-        }
         self.lock.give();
+        &topic.subscribers.get(&pid).unwrap().lock
     }
 
     pub(crate) fn get_ipc_message(
         &mut self,
         msg_topic: String,
-        sem: &'static Semaphore,
     ) -> Option<Vec<u8>> {
+        let cur_pid: usize = unsafe { get_cur_task().pid };
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
-                for subscriber in &mut topic.subscribers {
-                    if subscriber.lock as *const Semaphore == sem as *const Semaphore {
+                for (pid, subscriber) in &mut topic.subscribers {
+                    if *pid == cur_pid {
                         let message: Vec<u8> = topic.data[subscriber.index].clone();
                         subscriber.index += 1;
                         return Some(message);

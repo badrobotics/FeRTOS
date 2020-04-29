@@ -38,7 +38,7 @@ pub (crate) struct Task {
     task_info: Option<Box<NewTaskInfo>>,
     state: TaskStateStruct,
     queued: AtomicBool,
-    pid: usize,
+    pub(crate) pid: usize,
 }
 
 unsafe impl Send for Task {}
