@@ -37,6 +37,7 @@ impl TopicRegistry {
         self.lock.take();
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
+                topic.cleanup();
                 topic.add_message(message);
             }
         }
@@ -75,18 +76,21 @@ impl TopicRegistry {
         msg_topic: String,
     ) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
+        self.lock.take();
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
                 match topic.subscribers.get_mut(&cur_pid) {
                     Some(subscriber) => {
                         let message: Vec<u8> = topic.data[subscriber.index].clone();
                         subscriber.index += 1;
+                        self.lock.give();
                         return Some(message);
                     },
                     None => {},
                 }
             }
         }
+        self.lock.give();
         return None;
     }
 }
