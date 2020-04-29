@@ -1,12 +1,12 @@
 extern crate alloc;
 use crate::semaphore::Semaphore;
 use alloc::vec::Vec;
-use cstr_core::CString;
+use cstr_core::{CString, c_char};
 
 extern "C" {
-    fn ipc_publish(topic: *const u8, message: Message);
-    fn ipc_subscribe(topic: *const u8) -> *const Semaphore;
-    fn ipc_get_message(topic: *const u8, sem: *const Semaphore) -> Message;
+    fn ipc_publish(topic: *const c_char, message: Message);
+    fn ipc_subscribe(topic: *const c_char) -> *const Semaphore;
+    fn ipc_get_message(topic: *const c_char, sem: *const Semaphore) -> Message;
 }
 
 #[repr(C)]
@@ -45,7 +45,10 @@ impl Publisher {
     pub fn publish(&mut self, message: Vec<u8>) {
         let c_msg: Message = message.into();
         unsafe {
-            ipc_publish(self.topic.as_ptr(), c_msg);
+            ipc_publish(
+                (&self.topic).as_ptr(),
+                c_msg
+            );
         }
     }
 }
@@ -55,10 +58,10 @@ pub struct Subscriber {
     sem: *const Semaphore,
 }
 
-impl<'a> Subscriber {
+impl Subscriber {
     pub fn new(topic: &str) -> Self {
-        let c_topic: CString = CString::new(topic).unwrap();
-        let sem = unsafe { ipc_subscribe(c_topic.as_ptr()) };
+        let c_topic = CString::new(topic).unwrap();
+        let sem = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
 
         let subscriber = Subscriber {
             topic: c_topic,
@@ -70,7 +73,10 @@ impl<'a> Subscriber {
     pub fn get_message(&mut self) -> Vec<u8> {
         let message: Message;
         unsafe {
-            message = ipc_get_message(self.topic.as_ptr(), self.sem);
+            message = ipc_get_message(
+                (&self.topic).as_ptr(),
+                self.sem
+            );
         };
         message.into()
     }

@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::semaphore::Semaphore;
 use fe_osi::ipc::Message;
-use cstr_core::CString;
+use cstr_core::{CStr, c_char};
 
 extern "C" {
     pub fn svc_handler();
@@ -94,9 +94,9 @@ extern "C" fn sys_yield() -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) -> usize{
+extern "C" fn sys_ipc_publish(c_topic: *const c_char, message: Message) -> usize{
     unsafe {
-        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
         ipc::TOPIC_REGISTERY.publish_to_topic(topic, &(message.into()));
     }
 
@@ -104,23 +104,22 @@ extern "C" fn sys_ipc_publish(c_topic: *const u8, message: Message) -> usize{
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_subscribe(c_topic: *const u8) -> *const Semaphore {
-    let sem: Semaphore = Semaphore::new_mutex();
+extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
+    let sem: Semaphore = Semaphore::new(0);
     unsafe {
-        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
         ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem)
     }
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_get_message(c_topic: *const u8, sem: *const Semaphore) -> Message { 
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore) -> Message { 
     unsafe {
-        let sem_ref: &'static Semaphore = &*sem;
-        let topic = CString::from_raw(c_topic as *mut u8).into_string().unwrap();
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
+        let sem_ref: &Semaphore = &*sem;
 
         sem_ref.take();
         let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic).unwrap();
-        sem_ref.give();
 
         msg.into()
     }

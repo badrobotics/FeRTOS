@@ -31,7 +31,7 @@ impl Topic {
         subscriber.index = self.data.len();
 
         // take the condition variable to indicate no new messages
-        subscriber.set_unavailable();
+        //subscriber.set_unavailable();
 
         self.subscribers.insert(pid, subscriber);
     }
