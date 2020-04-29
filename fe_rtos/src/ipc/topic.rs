@@ -29,10 +29,6 @@ impl Topic {
     pub(crate) fn add_subscriber(&mut self, pid: usize, mut subscriber: Subscriber) {
         // set the index of the new subscriber to the end of the queue
         subscriber.index = self.data.len();
-
-        // take the condition variable to indicate no new messages
-        //subscriber.set_unavailable();
-
         self.subscribers.insert(pid, subscriber);
     }
 }
