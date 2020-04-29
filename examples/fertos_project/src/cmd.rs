@@ -1,5 +1,4 @@
 extern crate alloc;
-use alloc::string::String;
 use fe_osi;
 
 pub fn cmd(_: &mut u8) {
@@ -13,9 +12,11 @@ pub fn cmd(_: &mut u8) {
 
 pub fn hello_world(_: &mut u8) {
     let mut stdout = fe_osi::ipc::Publisher::new("stdout");
+    let mut count: usize = 0;
     loop {
-        let msg = String::from("Hello, World!\r\n").into_bytes();
+        let msg = format!("Hello, World! {}\r\n", count).into_bytes();
         stdout.publish(msg);
-        fe_osi::sleep(100);
+        fe_osi::sleep(1);
+        count += 1;
     }
 }

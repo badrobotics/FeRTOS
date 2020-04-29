@@ -5,6 +5,7 @@ mod cmd;
 mod uart_server;
 mod stdio;
 
+#[macro_use]
 extern crate alloc;
 
 use alloc::boxed::Box;
