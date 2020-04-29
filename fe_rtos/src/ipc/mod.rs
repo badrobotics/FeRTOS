@@ -77,12 +77,13 @@ impl TopicRegistry {
         let cur_pid: usize = unsafe { get_cur_task().pid };
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
-                for (pid, subscriber) in &mut topic.subscribers {
-                    if *pid == cur_pid {
+                match topic.subscribers.get_mut(&cur_pid) {
+                    Some(subscriber) => {
                         let message: Vec<u8> = topic.data[subscriber.index].clone();
                         subscriber.index += 1;
                         return Some(message);
-                    }
+                    },
+                    None => {},
                 }
             }
         }
