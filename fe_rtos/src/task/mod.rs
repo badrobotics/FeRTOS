@@ -16,6 +16,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crossbeam_queue::SegQueue;
 use fe_osi;
 use fe_osi::semaphore::Semaphore;
+use crate::ipc;
 
 #[repr(C)]
 union StackPtr {
@@ -311,6 +312,16 @@ fn kernel(_: &mut u32) {
             match NEW_TASK_QUEUE.pop() {
                 Ok(new_task) => { task_list.push_back(new_task); }
                 Err(_) => { break; },
+            }
+        }
+
+        unsafe {
+            if ipc::TOPIC_REGISTERY_LOCK.is_available() {
+                ipc::TOPIC_REGISTERY_LOCK.take();
+                for topic in &mut ipc::TOPIC_REGISTERY.topic_lookup {
+                    topic.cleanup();
+                }
+                ipc::TOPIC_REGISTERY_LOCK.give();
             }
         }
 

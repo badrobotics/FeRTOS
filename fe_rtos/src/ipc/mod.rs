@@ -10,12 +10,11 @@ use fe_osi::semaphore::Semaphore;
 use crate::task::get_cur_task;
 
 pub(crate) struct TopicRegistry {
-    pub(crate) lock: Semaphore,
     pub(crate) topic_lookup: Vec<Topic>,
 }
 
+pub(crate) static mut TOPIC_REGISTERY_LOCK: Semaphore = Semaphore::new_mutex();
 pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
-    lock: Semaphore::new_mutex(),
     topic_lookup: Vec::new(),
 };
 
@@ -34,19 +33,15 @@ impl TopicRegistry {
     }
 
     pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
-        self.lock.take();
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
-                topic.cleanup();
                 topic.add_message(message);
             }
         }
-        self.lock.give();
     }
 
     pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: Semaphore) -> &Semaphore {
         let pid: usize = unsafe { get_cur_task().pid };
-        self.lock.take();
         let subscriber = Subscriber::new(sem, None);
 
         if !self.topic_exists(&subscriber_topic) {
@@ -59,7 +54,7 @@ impl TopicRegistry {
             let mut ret = None;
             for topic in &mut self.topic_lookup {
                 if topic.name == *subscriber_topic {
-                    ret = Some(topic)
+                    ret = Some(topic);
                 }
             }
             ret
@@ -67,7 +62,6 @@ impl TopicRegistry {
 
         topic.add_subscriber(pid, subscriber);
 
-        self.lock.give();
         &topic.subscribers.get(&pid).unwrap().lock
     }
 
@@ -76,21 +70,18 @@ impl TopicRegistry {
         msg_topic: String,
     ) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
-        self.lock.take();
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
                 match topic.subscribers.get_mut(&cur_pid) {
                     Some(subscriber) => {
                         let message: Vec<u8> = topic.data[subscriber.index].clone();
                         subscriber.index += 1;
-                        self.lock.give();
                         return Some(message);
                     },
                     None => {},
                 }
             }
         }
-        self.lock.give();
         return None;
     }
 }

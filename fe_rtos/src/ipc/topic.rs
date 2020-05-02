@@ -23,7 +23,7 @@ impl Topic {
     pub(crate) fn add_message(&mut self, message: &Vec<u8>) {
         self.data.push(message.clone());
         for (_pid, subscriber) in &mut self.subscribers {
-            subscriber.set_available();
+            subscriber.lock.give();
         }
     }
 

@@ -97,7 +97,9 @@ extern "C" fn sys_yield() -> usize {
 extern "C" fn sys_ipc_publish(c_topic: *const c_char, message: Message) -> usize{
     unsafe {
         let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
+        ipc::TOPIC_REGISTERY_LOCK.take();
         ipc::TOPIC_REGISTERY.publish_to_topic(topic, &(message.into()));
+        ipc::TOPIC_REGISTERY_LOCK.give();
     }
 
     0
@@ -108,7 +110,10 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
     let sem: Semaphore = Semaphore::new(0);
     unsafe {
         let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
-        ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem)
+        ipc::TOPIC_REGISTERY_LOCK.take();
+        let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem);
+        ipc::TOPIC_REGISTERY_LOCK.give();
+        sem_ref
     }
 }
 
@@ -119,7 +124,9 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore)
         let sem_ref: &Semaphore = &*sem;
 
         sem_ref.take();
+        ipc::TOPIC_REGISTERY_LOCK.take();
         let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic).unwrap();
+        ipc::TOPIC_REGISTERY_LOCK.give();
 
         msg.into()
     }
