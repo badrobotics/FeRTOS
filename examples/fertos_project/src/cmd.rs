@@ -16,7 +16,6 @@ pub fn hello_world(_: &mut u8) {
     loop {
         let msg = format!("Hello, World! {}\r\n", count).into_bytes();
         stdout.publish(msg);
-        fe_osi::sleep(1);
         count += 1;
     }
 }

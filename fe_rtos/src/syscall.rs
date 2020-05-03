@@ -58,9 +58,14 @@ extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI) -> usize {
 #[no_mangle]
 extern "C" fn sys_block(sem: *const Semaphore) -> usize {
     while !task::block(sem) {
-        sys_yield();
+        unsafe {
+            if (*sem).is_available() {
+                break;
+            } else {
+                sys_yield();
+            }
+        }
     }
-
     0
 }
 

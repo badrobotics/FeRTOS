@@ -58,13 +58,13 @@ fn main() -> ! {
         Some(Box::new(uart0_tx)),
     );
 
-    fe_osi::task::task_spawn(
-        fe_rtos::task::DEFAULT_STACK_SIZE,
-        uart_server::uart_receive_server,
-        Some(Box::new(uart0_rx)),
-    );
+    //fe_osi::task::task_spawn(
+    //    fe_rtos::task::DEFAULT_STACK_SIZE,
+    //    uart_server::uart_receive_server,
+    //    Some(Box::new(uart0_rx)),
+    //);
 
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::cmd, None);
+    //fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::cmd, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::hello_world, None);
 
     // Start the FeRTOS scheduler

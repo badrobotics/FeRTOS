@@ -35,6 +35,7 @@ impl TopicRegistry {
     pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
+                topic.cleanup();
                 topic.add_message(message);
             }
         }
