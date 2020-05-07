@@ -3,16 +3,15 @@ use alloc::collections::BTreeMap;
 
 use crate::ipc::subscriber::Subscriber;
 use alloc::vec::Vec;
-use alloc::string::String;
 
 pub(crate) struct Topic {
-    pub(crate) name: String,
+    pub(crate) name: Vec<u8>,
     pub(crate) data: Vec<Vec<u8>>,
     pub(crate) subscribers: BTreeMap<usize, Subscriber>,
 }
 
 impl Topic {
-    pub(crate) fn new(name: &String) -> Topic {
+    pub(crate) fn new(name: &Vec<u8>) -> Topic {
         Topic {
             name: name.clone(),
             data: Vec::new(),
@@ -20,8 +19,8 @@ impl Topic {
         }
     }
 
-    pub(crate) fn add_message(&mut self, message: &Vec<u8>) {
-        self.data.push(message.clone());
+    pub(crate) fn add_message(&mut self, message: Vec<u8>) {
+        self.data.push(message);
         for (_pid, subscriber) in &mut self.subscribers {
             subscriber.lock.give();
         }
