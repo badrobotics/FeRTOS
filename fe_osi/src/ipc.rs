@@ -1,11 +1,12 @@
 extern crate alloc;
 use crate::semaphore::Semaphore;
 use alloc::vec::Vec;
+use cstr_core::{CString, c_char};
 
 extern "C" {
-    fn ipc_publish(topic_ptr: *const u8, topic_len: usize, message_ptr: *mut u8, msg_len: usize);
-    fn ipc_subscribe(topic_ptr: *const u8, topic_len: usize) -> *const Semaphore;
-    fn ipc_get_message(topic_ptr: *const u8, topic_len: usize, sem: *const Semaphore) -> Message;
+    fn ipc_publish(topic: *const c_char, message: Message);
+    fn ipc_subscribe(topic: *const c_char) -> *const Semaphore;
+    fn ipc_get_message(topic: *const c_char, sem: *const Semaphore) -> Message;
 }
 
 #[repr(C)]
@@ -32,45 +33,38 @@ impl Into<Vec<u8>> for Message {
 }
 
 pub struct Publisher {
-    pub topic: Vec<u8>,
+    pub topic: CString,
 }
 
 impl Publisher {
     pub fn new(topic: &str) -> Self {
-        Publisher { topic: topic.as_bytes().to_vec() }
+        let c_topic = CString::new(topic).unwrap();
+        Publisher { topic: c_topic }
     }
 
     pub fn publish(&mut self, message: Vec<u8>) {
+        let c_msg: Message = message.into();
         unsafe {
-            let (msg_ptr, msg_len, _msg_cap) = message.into_raw_parts();
             ipc_publish(
-                self.topic.as_ptr(),
-                self.topic.len(),
-                msg_ptr,
-                msg_len,
+                (&self.topic).as_ptr(),
+                c_msg
             );
         }
     }
 }
 
 pub struct Subscriber {
-    pub topic: Vec<u8>,
+    pub topic: CString,
     sem: *const Semaphore,
 }
 
 impl Subscriber {
     pub fn new(topic: &str) -> Self {
-        let vec_topic = topic.as_bytes().to_vec();
-
-        let sem = unsafe {
-            ipc_subscribe(
-                vec_topic.as_ptr(),
-                vec_topic.len(),
-            )
-        };
+        let c_topic = CString::new(topic).unwrap();
+        let sem = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
 
         let subscriber = Subscriber {
-            topic: vec_topic,
+            topic: c_topic,
             sem: sem,
         };
         subscriber
@@ -80,8 +74,7 @@ impl Subscriber {
         let message: Message;
         unsafe {
             message = ipc_get_message(
-                self.topic.as_ptr(),
-                self.topic.len(),
+                (&self.topic).as_ptr(),
                 self.sem
             );
         };

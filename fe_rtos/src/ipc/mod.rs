@@ -4,6 +4,7 @@ mod topic;
 extern crate alloc;
 use crate::ipc::subscriber::Subscriber;
 use crate::ipc::topic::Topic;
+use alloc::string::String;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
 use crate::task::get_cur_task;
@@ -18,7 +19,7 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
 };
 
 impl TopicRegistry {
-    fn topic_exists(&mut self, requested_topic: &Vec<u8>) -> bool {
+    fn topic_exists(&mut self, requested_topic: &String) -> bool {
         for topic in &mut self.topic_lookup {
             if topic.name == *requested_topic {
                 return true;
@@ -31,16 +32,16 @@ impl TopicRegistry {
         self.topic_lookup.push(topic);
     }
 
-    pub(crate) fn publish_to_topic(&mut self, message_topic: &Vec<u8>, message: Vec<u8>) {
+    pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
         for topic in &mut self.topic_lookup {
-            if topic.name == *message_topic {
+            if topic.name == message_topic {
                 topic.cleanup();
-                topic.add_message(message.clone());
+                topic.add_message(message);
             }
         }
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &Vec<u8>, sem: Semaphore) -> &Semaphore {
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: Semaphore) -> &Semaphore {
         let pid: usize = unsafe { get_cur_task().pid };
         let subscriber = Subscriber::new(sem, None);
 
@@ -67,11 +68,11 @@ impl TopicRegistry {
 
     pub(crate) fn get_ipc_message(
         &mut self,
-        msg_topic: &Vec<u8>,
+        msg_topic: String,
     ) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
         for topic in &mut self.topic_lookup {
-            if topic.name == *msg_topic {
+            if topic.name == msg_topic {
                 match topic.subscribers.get_mut(&cur_pid) {
                     Some(subscriber) => {
                         let message: Vec<u8> = topic.data[subscriber.index].clone();

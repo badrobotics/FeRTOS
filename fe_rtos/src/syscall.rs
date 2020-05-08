@@ -4,10 +4,10 @@ use crate::fe_alloc;
 use crate::task;
 use crate::ipc;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::semaphore::Semaphore;
 use fe_osi::ipc::Message;
+use cstr_core::{CStr, c_char};
 
 extern "C" {
     pub fn svc_handler();
@@ -99,44 +99,40 @@ extern "C" fn sys_yield() -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_publish(topic_ptr: *mut u8, topic_len: usize, msg_ptr: *mut u8, msg_len: usize) -> usize{
+extern "C" fn sys_ipc_publish(c_topic: *const c_char, message: Message) -> usize{
     unsafe {
-        let msg: Vec<u8> = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
-        let topic: Vec<u8> = Vec::from_raw_parts(topic_ptr, topic_len, topic_len);
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
         ipc::TOPIC_REGISTERY_LOCK.take();
-        ipc::TOPIC_REGISTERY.publish_to_topic(&topic, msg);
+        ipc::TOPIC_REGISTERY.publish_to_topic(topic, &(message.into()));
         ipc::TOPIC_REGISTERY_LOCK.give();
-        Box::into_raw(Box::new(topic));
     }
 
     0
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_subscribe(topic_ptr: *mut u8, topic_len: usize) -> *const Semaphore {
+extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
     let sem: Semaphore = Semaphore::new(0);
     unsafe {
-        let topic: Vec<u8> = Vec::from_raw_parts(topic_ptr, topic_len, topic_len);
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
         ipc::TOPIC_REGISTERY_LOCK.take();
-        let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(&topic, sem);
+        let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem);
         ipc::TOPIC_REGISTERY_LOCK.give();
-        Box::into_raw(Box::new(topic));
         sem_ref
     }
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_get_message(topic_ptr: *mut u8, topic_len: usize, sem: *const Semaphore) -> Message { 
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore) -> Message { 
     unsafe {
+        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
         let sem_ref: &Semaphore = &*sem;
-        let topic: Vec<u8> = Vec::from_raw_parts(topic_ptr, topic_len, topic_len);
 
         sem_ref.take();
         ipc::TOPIC_REGISTERY_LOCK.take();
-        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(&topic).unwrap();
+        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic).unwrap();
         ipc::TOPIC_REGISTERY_LOCK.give();
-        Box::into_raw(Box::new(topic));
 
-        msg.clone().into()
+        msg.into()
     }
 }
