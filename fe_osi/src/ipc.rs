@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use cstr_core::{CString, c_char};
 
 extern "C" {
-    fn ipc_publish(topic: *const c_char, message: Message);
+    fn ipc_publish(topic: *const c_char, msg_ptr: *mut u8, msg_len: usize);
     fn ipc_subscribe(topic: *const c_char) -> *const Semaphore;
     fn ipc_get_message(topic: *const c_char, sem: *const Semaphore) -> Message;
 }
@@ -42,12 +42,14 @@ impl Publisher {
         Publisher { topic: c_topic }
     }
 
-    pub fn publish(&mut self, message: Vec<u8>) {
-        let c_msg: Message = message.into();
+    pub fn publish(&mut self, mut message: Vec<u8>) {
+        message.shrink_to_fit();
+        let (msg_ptr, msg_len, _msg_cap) = message.into_raw_parts();
         unsafe {
             ipc_publish(
                 (&self.topic).as_ptr(),
-                c_msg
+                msg_ptr,
+                msg_len
             );
         }
     }

@@ -4,6 +4,7 @@ use crate::fe_alloc;
 use crate::task;
 use crate::ipc;
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::semaphore::Semaphore;
 use fe_osi::ipc::Message;
@@ -99,11 +100,12 @@ extern "C" fn sys_yield() -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_publish(c_topic: *const c_char, message: Message) -> usize{
+extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize{
     unsafe {
         let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
+        let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
         ipc::TOPIC_REGISTERY_LOCK.take();
-        ipc::TOPIC_REGISTERY.publish_to_topic(topic, &(message.into()));
+        ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
         ipc::TOPIC_REGISTERY_LOCK.give();
     }
 
