@@ -10,10 +10,29 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use hal::prelude::*;
+#[cfg(feature = "tm4c1294")]
 use tm4c129x_hal as hal;
+#[cfg(feature = "tm4c123")]
+use tm4c123x_hal as hal;
 use cortex_m::peripheral::scb::Exception;
 use fe_osi;
 use fe_rtos;
+
+#[cfg(feature = "tm4c1294")]
+fn get_oscillator() -> hal::sysctl::Oscillator {
+    hal::sysctl::Oscillator::Main(
+        hal::sysctl::CrystalFrequency::_25mhz,
+        hal::sysctl::SystemClock::UsePll(hal::sysctl::PllOutputFrequency::_120mhz),
+    )
+}
+
+#[cfg(feature = "tm4c123")]
+fn get_oscillator() -> hal::sysctl::Oscillator {
+    hal::sysctl::Oscillator::Main(
+        hal::sysctl::CrystalFrequency::_16mhz,
+        hal::sysctl::SystemClock::UsePll(hal::sysctl::PllOutputFrequency::_80_00mhz),
+    )
+}
 
 #[no_mangle]
 fn main() -> ! {
@@ -21,13 +40,13 @@ fn main() -> ! {
     let cp = hal::CorePeripherals::take().unwrap();
 
     let mut sc = p.SYSCTL.constrain();
-    sc.clock_setup.oscillator = hal::sysctl::Oscillator::Main(
-        hal::sysctl::CrystalFrequency::_25mhz,
-        hal::sysctl::SystemClock::UsePll(hal::sysctl::PllOutputFrequency::_120mhz),
-    );
+    sc.clock_setup.oscillator = get_oscillator();
     let clocks = sc.clock_setup.freeze();
 
+    #[cfg(feature = "tm4c1294")]
     let mut porta = p.GPIO_PORTA_AHB.split(&sc.power_control);
+    #[cfg(feature = "tm4c123")]
+    let mut porta = p.GPIO_PORTA.split(&sc.power_control);
 
     // Activate UART
     let uart0 = hal::serial::Serial::uart0(

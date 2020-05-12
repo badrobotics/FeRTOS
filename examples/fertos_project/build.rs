@@ -6,7 +6,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //extend the library search path
     println!("cargo:rustc-link-search={}", out_dir.display());
-    File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link.x"))?;
+    if cfg!(feature = "tm4c123") {
+        File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link_123.x"))?;
+    } else {
+        File::create(out_dir.join("link.x"))?.write_all(include_bytes!("link_1294.x"))?;
+    }
 
     Ok(())
 }
