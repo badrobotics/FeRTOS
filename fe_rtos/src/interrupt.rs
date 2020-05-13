@@ -17,7 +17,7 @@ pub fn int_register(irqn: i8, int_handler: unsafe extern "C" fn()) {
         let regs = cortex_m::peripheral::SCB::ptr();
 
         //If the interrupt table has not been relocated to RAM, do so
-        if (*regs).vtor.read() != _svtable as u32 {
+        if (*regs).vtor.read() != &_svtable as *const u32 as u32 {
             // Number of interrupts in vector table
             let count = (&_evtable as *const u32 as usize - &_svtable as *const u32 as usize) / 4;
 
