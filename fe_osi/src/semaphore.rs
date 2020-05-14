@@ -48,6 +48,16 @@ impl Semaphore {
         }
     }
 
+    pub fn try_take(&self) -> bool {
+        let old_val = self.count.load(Ordering::SeqCst);
+
+        if old_val == 0 {
+            return false;
+        }
+
+        self.count.compare_and_swap(old_val, old_val - 1, Ordering::SeqCst) == old_val
+    }
+
     pub fn give(&self) {
         if self.mutex {
             self.count.store(1, Ordering::SeqCst);
