@@ -65,4 +65,20 @@ impl Semaphore {
             self.count.fetch_add(1, Ordering::SeqCst);
         }
     }
+
+    pub fn with_lock<F : FnMut()>(&self, mut f : F) {
+        self.take();
+        f();
+        self.give();
+    }
+
+    pub fn try_with_lock<F : FnMut()>(&self, mut f : F) -> bool {
+        if self.try_take() {
+            f();
+            self.give();
+            true
+        } else {
+            false
+        }
+    }
 }
