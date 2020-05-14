@@ -3,7 +3,9 @@ mod topic;
 
 extern crate alloc;
 use crate::ipc::subscriber::Subscriber;
+use crate::ipc::subscriber::MessageNode;
 use crate::ipc::topic::Topic;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
 use crate::task::get_cur_task;
@@ -34,7 +36,6 @@ impl TopicRegistry {
     pub(crate) fn publish_to_topic(&mut self, message_topic: &str, message: &[u8]) {
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
-                topic.cleanup();
                 topic.add_message(message);
             }
         }
@@ -81,9 +82,15 @@ impl TopicRegistry {
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
                 if let Some(subscriber) = topic.subscribers.get_mut(&cur_pid) {
-                    let message: Vec<u8> = topic.data[subscriber.index].clone();
-                    subscriber.index += 1;
-                    return Some(message);
+                    let next_node : Arc<MessageNode> = match &subscriber.next_message {
+                        Some(m) => Arc::clone(&m),
+                        None => return None,
+                    };
+                    subscriber.next_message = match &*next_node.next.borrow() {
+                        Some(m) => Some(Arc::clone(&m)),
+                        None => None,
+                    };
+                    return Some(next_node.data.clone());
                 }
             }
         }

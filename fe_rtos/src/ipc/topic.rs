@@ -1,13 +1,14 @@
 extern crate alloc;
 use alloc::collections::BTreeMap;
-
+use core::cell::RefCell;
 use crate::ipc::subscriber::Subscriber;
-use alloc::vec::Vec;
+use crate::ipc::subscriber::MessageNode;
+use alloc::sync::Arc;
 use alloc::string::String;
 
 pub(crate) struct Topic {
     pub(crate) name: String,
-    pub(crate) data: Vec<Vec<u8>>,
+    pub(crate) tail: Option<Arc<MessageNode>>,
     pub(crate) subscribers: BTreeMap<usize, Subscriber>,
 }
 
@@ -15,37 +16,38 @@ impl Topic {
     pub(crate) fn new(name: &str) -> Topic {
         Topic {
             name: String::from(name),
-            data: Vec::new(),
+            tail: None,
             subscribers: BTreeMap::new(),
         }
     }
 
     pub(crate) fn add_message(&mut self, message: &[u8]) {
-        self.data.push(message.to_vec());
+        let new_tail = Arc::new(MessageNode {
+            data: message.to_vec(),
+            next: RefCell::new(None),
+        });
+
+        // Add the new message to the end of the list
+        match &self.tail {
+            Some(m) => {
+                m.next.replace(Some(Arc::clone(&new_tail)));
+            },
+            None => (),
+        };
+        // Point tail to the end of the list
+        self.tail = Some(Arc::clone(&new_tail));
+
         for subscriber in &mut self.subscribers.values_mut() {
+            match subscriber.next_message {
+                Some(_) => (),
+                None => subscriber.next_message = Some(Arc::clone(&new_tail)),
+            }
             subscriber.lock.give();
         }
     }
 
     pub(crate) fn add_subscriber(&mut self, pid: usize, mut subscriber: Subscriber) {
-        // set the index of the new subscriber to the end of the queue
-        subscriber.index = self.data.len();
+        subscriber.next_message = None;
         self.subscribers.insert(pid, subscriber);
-    }
-
-    pub(crate) fn cleanup(&mut self) -> usize {
-        let mut indicies: Vec<usize> = Vec::new();
-        for subscriber in &mut self.subscribers.values_mut() {
-            indicies.push(subscriber.index);
-        }
-        let min_index = match indicies.iter().min() {
-            Some(min) => *min,
-            None => 0,
-        };
-        self.data.drain(0..(min_index));
-        for subscriber in &mut self.subscribers.values_mut() {
-            subscriber.index -= min_index;
-        }
-        min_index
     }
 }

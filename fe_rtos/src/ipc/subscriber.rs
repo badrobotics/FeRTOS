@@ -1,19 +1,24 @@
+extern crate alloc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::cell::RefCell;
 use fe_osi::semaphore::Semaphore;
+
+pub(crate) struct MessageNode {
+    pub data: Vec<u8>,
+    pub next: RefCell<Option<Arc<MessageNode>>>,
+}
 
 pub(crate) struct Subscriber {
     pub(crate) lock: Semaphore,
-    pub(crate) index: usize,
+    pub(crate) next_message: Option<Arc<MessageNode>>,
 }
 
 impl Subscriber {
-    pub(crate) fn new(sem: Semaphore, index: Option<usize>) -> Subscriber {
-        let start_index: usize = match index {
-            Some(i) => i,
-            None => 0,
-        };
+    pub(crate) fn new(sem: Semaphore, first_message: Option<Arc<MessageNode>>) -> Subscriber {
         Subscriber {
             lock: sem,
-            index: start_index,
+            next_message: first_message,
         }
     }
 }
