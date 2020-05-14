@@ -27,11 +27,7 @@ impl Semaphore {
     }
 
     pub fn is_available(&self) -> bool {
-        if self.count.load(Ordering::Relaxed) > 0 {
-            true
-        } else {
-            false
-        }
+        self.count.load(Ordering::Relaxed) > 0
     }
 
     pub fn take(&self) {
