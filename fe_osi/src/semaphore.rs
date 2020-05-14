@@ -48,11 +48,37 @@ impl Semaphore {
         }
     }
 
+    pub fn try_take(&self) -> bool {
+        let old_val = self.count.load(Ordering::SeqCst);
+
+        if old_val == 0 {
+            return false;
+        }
+
+        self.count.compare_and_swap(old_val, old_val - 1, Ordering::SeqCst) == old_val
+    }
+
     pub fn give(&self) {
         if self.mutex {
             self.count.store(1, Ordering::SeqCst);
         } else {
             self.count.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    pub fn with_lock<F : FnMut()>(&self, mut f : F) {
+        self.take();
+        f();
+        self.give();
+    }
+
+    pub fn try_with_lock<F : FnMut()>(&self, mut f : F) -> bool {
+        if self.try_take() {
+            f();
+            self.give();
+            true
+        } else {
+            false
         }
     }
 }

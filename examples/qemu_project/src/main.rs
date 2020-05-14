@@ -19,11 +19,11 @@ fn hello_task(lock : &mut Arc<Semaphore>) {
     let mut counter = 0;
     loop {
         let msg = alloc::format!("Hello, World! {}\r\n", counter).into_bytes();
-        lock.take();
-        for c in msg {
-            write_byte(c);
-        }
-        lock.give();
+        lock.with_lock(|| {
+            for c in &msg {
+                write_byte(*c);
+            }
+        });
         counter += 1;
         fe_osi::sleep(10);
     }
@@ -33,11 +33,11 @@ fn welcome_task(lock : &mut Arc<Semaphore>) {
     let mut counter = 0;
     loop {
         let msg = alloc::format!("Welcome to FeRTOS! {}\r\n", counter).into_bytes();
-        lock.take();
-        for c in msg {
-            write_byte(c);
-        }
-        lock.give();
+        lock.with_lock(|| {
+            for c in &msg {
+                write_byte(*c);
+            }
+        });
         counter += 1;
         fe_osi::sleep(10);
     }
