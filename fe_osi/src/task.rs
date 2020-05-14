@@ -1,5 +1,6 @@
 extern crate alloc;
 use alloc::boxed::Box;
+use core::ptr::null_mut;
 
 extern "C" {
     fn do_task_spawn(stack_size: usize, entry_point: *const u32, parameter: *mut u32);  
@@ -9,7 +10,7 @@ pub fn task_spawn<T: Send>(stack_size: usize, entry_point: fn(&mut T), parameter
     unsafe {
         let param_ptr = match parameter {
             Some(param) => Box::into_raw(param) as *mut u32,
-            None => 0 as *mut u32
+            None => null_mut()
         };
         do_task_spawn(stack_size, entry_point as *const u32, param_ptr);
     }
