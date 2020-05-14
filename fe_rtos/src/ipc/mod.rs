@@ -40,7 +40,7 @@ impl TopicRegistry {
         }
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) -> &Semaphore {
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) -> Option<&Semaphore> {
         let sem: Semaphore = Semaphore::new(0);
         let pid: usize = unsafe { get_cur_task().pid };
         let subscriber = Subscriber::new(sem, None);
@@ -51,7 +51,7 @@ impl TopicRegistry {
         }
         
         // get reference to desired topic 
-        let topic: &mut Topic = {
+        let topic = {
             let mut ret = None;
             for topic in &mut self.topic_lookup {
                 if topic.name == *subscriber_topic {
@@ -59,11 +59,18 @@ impl TopicRegistry {
                 }
             }
             ret
-        }.unwrap();
+        };
 
-        topic.add_subscriber(pid, subscriber);
-
-        &topic.subscribers.get(&pid).unwrap().lock
+        match topic {
+            Some(t) => {
+                t.add_subscriber(pid, subscriber);
+                match &t.subscribers.get(&pid) {
+                    Some(subscriber) => Some(&subscriber.lock),
+                    None => None,
+                }
+            },
+            None => None,
+        }
     }
 
     pub(crate) fn get_ipc_message(

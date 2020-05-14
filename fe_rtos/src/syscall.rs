@@ -118,14 +118,18 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
 #[no_mangle]
 extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
     unsafe {
-        match CStr::from_ptr(c_topic).to_str() {
+        let sem_ref = match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => {
                 ipc::TOPIC_REGISTERY_LOCK.take();
-                let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
+                let sem = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
                 ipc::TOPIC_REGISTERY_LOCK.give();
-                sem_ref
+                sem
             },
-            Err(_) => { core::ptr::null() }
+            Err(_) => { None }
+        };
+        match sem_ref {
+            Some(s) => s,
+            None => core::ptr::null()
         }
     }
 }
@@ -137,6 +141,7 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore)
             Ok(topic) => {
                 let sem_ref: &Semaphore = &*sem;
                 sem_ref.take();
+
                 ipc::TOPIC_REGISTERY_LOCK.take();
                 let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
                 ipc::TOPIC_REGISTERY_LOCK.give();
