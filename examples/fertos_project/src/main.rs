@@ -69,7 +69,7 @@ fn main() -> ! {
     fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch);
     fe_rtos::interrupt::int_register(Exception::SVCall.irqn(), fe_rtos::syscall::svc_handler);
 
-    let (uart0_tx, uart0_rx) = uart0.split();
+    let (uart0_tx, _uart0_rx) = uart0.split();
 
     fe_osi::task::task_spawn(
         fe_rtos::task::DEFAULT_STACK_SIZE,

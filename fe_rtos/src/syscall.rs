@@ -100,41 +100,53 @@ extern "C" fn sys_yield() -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize{
+extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize {
     unsafe {
-        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
-        let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
-        ipc::TOPIC_REGISTERY_LOCK.take();
-        ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
-        ipc::TOPIC_REGISTERY_LOCK.give();
+        match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => {
+                let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
+                ipc::TOPIC_REGISTERY_LOCK.take();
+                ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
+                ipc::TOPIC_REGISTERY_LOCK.give();
+                0
+            },
+            Err(_) => 1
+        }
     }
-
-    0
 }
 
 #[no_mangle]
 extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
-    let sem: Semaphore = Semaphore::new(0);
     unsafe {
-        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
-        ipc::TOPIC_REGISTERY_LOCK.take();
-        let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic, sem);
-        ipc::TOPIC_REGISTERY_LOCK.give();
-        sem_ref
+        match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => {
+                ipc::TOPIC_REGISTERY_LOCK.take();
+                let sem_ref = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
+                ipc::TOPIC_REGISTERY_LOCK.give();
+                sem_ref
+            },
+            Err(_) => { core::ptr::null() }
+        }
     }
 }
 
 #[no_mangle]
 extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore) -> Message { 
     unsafe {
-        let topic = CStr::from_ptr(c_topic).clone().to_string_lossy().into_owned();
-        let sem_ref: &Semaphore = &*sem;
-
-        sem_ref.take();
-        ipc::TOPIC_REGISTERY_LOCK.take();
-        let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic).unwrap();
-        ipc::TOPIC_REGISTERY_LOCK.give();
-
-        msg.into()
+        let message = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => {
+                let sem_ref: &Semaphore = &*sem;
+                sem_ref.take();
+                ipc::TOPIC_REGISTERY_LOCK.take();
+                let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
+                ipc::TOPIC_REGISTERY_LOCK.give();
+                msg
+            },
+            Err (_) => None,
+        };
+        match message {
+            Some(valid_msg) => valid_msg.into(),
+            None => Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }, 
+        }
     }
 }

@@ -12,17 +12,17 @@ pub(crate) struct Topic {
 }
 
 impl Topic {
-    pub(crate) fn new(name: &String) -> Topic {
+    pub(crate) fn new(name: &str) -> Topic {
         Topic {
-            name: name.clone(),
+            name: String::from(name),
             data: Vec::new(),
             subscribers: BTreeMap::new(),
         }
     }
 
-    pub(crate) fn add_message(&mut self, message: &Vec<u8>) {
-        self.data.push(message.clone());
-        for (_pid, subscriber) in &mut self.subscribers {
+    pub(crate) fn add_message(&mut self, message: &[u8]) {
+        self.data.push(message.to_vec());
+        for subscriber in &mut self.subscribers.values_mut() {
             subscriber.lock.give();
         }
     }
@@ -35,7 +35,7 @@ impl Topic {
 
     pub(crate) fn cleanup(&mut self) -> usize {
         let mut indicies: Vec<usize> = Vec::new();
-        for (_pid, subscriber) in &mut self.subscribers {
+        for subscriber in &mut self.subscribers.values_mut() {
             indicies.push(subscriber.index);
         }
         let min_index = match indicies.iter().min() {
@@ -43,8 +43,8 @@ impl Topic {
             None => 0,
         };
         self.data.drain(0..(min_index));
-        for (_pid, subscriber) in &mut self.subscribers {
-            subscriber.index = subscriber.index - (min_index);
+        for subscriber in &mut self.subscribers.values_mut() {
+            subscriber.index -= min_index;
         }
         min_index
     }

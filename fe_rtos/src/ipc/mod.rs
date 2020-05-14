@@ -4,7 +4,6 @@ mod topic;
 extern crate alloc;
 use crate::ipc::subscriber::Subscriber;
 use crate::ipc::topic::Topic;
-use alloc::string::String;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
 use crate::task::get_cur_task;
@@ -19,20 +18,20 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
 };
 
 impl TopicRegistry {
-    fn topic_exists(&mut self, requested_topic: &String) -> bool {
+    fn topic_exists(&mut self, requested_topic: &str) -> bool {
         for topic in &mut self.topic_lookup {
             if topic.name == *requested_topic {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn add_topic(&mut self, topic: Topic) {
         self.topic_lookup.push(topic);
     }
 
-    pub(crate) fn publish_to_topic(&mut self, message_topic: String, message: &Vec<u8>) {
+    pub(crate) fn publish_to_topic(&mut self, message_topic: &str, message: &[u8]) {
         for topic in &mut self.topic_lookup {
             if topic.name == message_topic {
                 topic.cleanup();
@@ -41,7 +40,8 @@ impl TopicRegistry {
         }
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: String, sem: Semaphore) -> &Semaphore {
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) -> &Semaphore {
+        let sem: Semaphore = Semaphore::new(0);
         let pid: usize = unsafe { get_cur_task().pid };
         let subscriber = Subscriber::new(sem, None);
 
@@ -68,21 +68,18 @@ impl TopicRegistry {
 
     pub(crate) fn get_ipc_message(
         &mut self,
-        msg_topic: String,
+        msg_topic: &str,
     ) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
         for topic in &mut self.topic_lookup {
             if topic.name == msg_topic {
-                match topic.subscribers.get_mut(&cur_pid) {
-                    Some(subscriber) => {
-                        let message: Vec<u8> = topic.data[subscriber.index].clone();
-                        subscriber.index += 1;
-                        return Some(message);
-                    },
-                    None => {},
+                if let Some(subscriber) = topic.subscribers.get_mut(&cur_pid) {
+                    let message: Vec<u8> = topic.data[subscriber.index].clone();
+                    subscriber.index += 1;
+                    return Some(message);
                 }
             }
         }
-        return None;
+        None
     }
 }
