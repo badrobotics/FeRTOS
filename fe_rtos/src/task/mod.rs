@@ -327,6 +327,8 @@ fn kernel(_: &mut u32) {
                         PUSHING_TASK.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
                         PUSHING_TASK.store(false, Ordering::SeqCst);
+                    } else if SCHEDULER_QUEUE.is_empty() {
+                        task.queued.store(false, Ordering::SeqCst);
                     }
                 },
                 TaskState::Asleep(wake_up_ticks) => {
