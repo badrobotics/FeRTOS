@@ -15,8 +15,6 @@ use tm4c129x_hal as hal;
 #[cfg(feature = "tm4c123")]
 use tm4c123x_hal as hal;
 use cortex_m::peripheral::scb::Exception;
-use fe_osi;
-use fe_rtos;
 
 #[cfg(feature = "tm4c1294")]
 fn get_oscillator() -> hal::sysctl::Oscillator {
@@ -59,7 +57,7 @@ fn main() -> ! {
             .into_af_push_pull::<hal::gpio::AF1>(&mut porta.control),
         (),
         (),
-        115200_u32.bps(),
+        115_200_u32.bps(),
         hal::serial::NewlineMode::SwapLFtoCRLF,
         &clocks,
         &sc.power_control,

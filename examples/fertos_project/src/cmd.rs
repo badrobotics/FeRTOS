@@ -1,5 +1,4 @@
 extern crate alloc;
-use fe_osi;
 
 pub fn cmd(_: &mut u8) {
     let mut stdin = fe_osi::ipc::Subscriber::new("stdin").unwrap();

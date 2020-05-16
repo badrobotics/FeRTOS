@@ -133,29 +133,40 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
     }
 }
 
+fn get_null_message() -> Message {
+    Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }
+}
+
 #[no_mangle]
-extern "C" fn sys_ipc_get_message(c_topic: *const c_char) -> Message { 
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Message { 
+    let mut sem_ref: Option<&Semaphore> = None;
     unsafe {
-        let message = match CStr::from_ptr(c_topic).to_str() {
-            Ok(topic) => {
-                let mut sem_ref: Option<&Semaphore> = None;
-                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
-                    sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
-                });
 
-                sem_ref.unwrap().take();
-
-                let mut msg: Option<Vec<u8>> = None;
-                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
-                    msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
-                });
-                msg
-            },
-            Err (_) => None,
+        let topic = match CStr::from_ptr(c_topic).to_str() {
+            Ok(t) => t,
+            Err(_) => return get_null_message()
         };
+        
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
+        });
+
+        if block {
+            sem_ref.unwrap().take();
+        } else {
+            if !sem_ref.unwrap().try_take() {
+                return get_null_message();
+            }
+        }
+
+        let mut message: Option<Vec<u8>> = None;
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            message = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
+        });
+
         match message {
-            Some(valid_msg) => valid_msg.into(),
-            None => Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }, 
+            Some(msg) => msg.into(),
+            None => get_null_message(),
         }
     }
 }

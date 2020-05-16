@@ -6,7 +6,7 @@ use cstr_core::{c_char, CString};
 extern "C" {
     fn ipc_publish(topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize;
     fn ipc_subscribe(topic: *const c_char) -> usize;
-    fn ipc_get_message(topic: *const c_char) -> Message;
+    fn ipc_get_message(topic: *const c_char, block: bool) -> Message;
 }
 
 #[repr(C)]
@@ -72,14 +72,22 @@ impl Subscriber {
         }
     }
 
-    pub fn get_message(&mut self) -> Option<Vec<u8>> {
+    fn get_message_base(&mut self, block: bool) -> Option<Vec<u8>> {
         let message: Message = unsafe {
-            ipc_get_message((&self.topic).as_ptr())
+            ipc_get_message((&self.topic).as_ptr(), block)
         };
         if message.valid {
             Some(message.into())
         } else {
             None
         }
+    }
+
+    pub fn get_message(&mut self) -> Option<Vec<u8>> {
+        self.get_message_base(true)
+    }
+
+    pub fn get_message_nonblocking(&mut self) -> Option<Vec<u8>> {
+        self.get_message_base(false)
     }
 }
