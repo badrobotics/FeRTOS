@@ -108,6 +108,14 @@ unsafe fn scheduler() {
         return;
     }
 
+    let count = match &NEXT_TASK {
+        Some(task) => Arc::strong_count(&task),
+        None => 0xFF,
+    };
+    if count == 1 {
+        return;
+    }
+
     //Find the next task to run if there is one
     match SCHEDULER_QUEUE.pop() {
         Ok(task) => {
