@@ -105,9 +105,9 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
         match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => {
                 let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
-                ipc::TOPIC_REGISTERY_LOCK.take();
-                ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
-                ipc::TOPIC_REGISTERY_LOCK.give();
+                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+                    ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
+                });
                 0
             },
             Err(_) => {
@@ -119,35 +119,36 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> *const Semaphore {
+extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
     unsafe {
-        let sem_ref = match CStr::from_ptr(c_topic).to_str() {
+        match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => {
-                ipc::TOPIC_REGISTERY_LOCK.take();
-                let sem = ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
-                ipc::TOPIC_REGISTERY_LOCK.give();
-                sem
+                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+                    ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
+                });
+                0
             },
-            Err(_) => { None }
-        };
-        match sem_ref {
-            Some(s) => s,
-            None => core::ptr::null()
+            Err(_) => 1
         }
     }
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore) -> Message { 
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char) -> Message { 
     unsafe {
         let message = match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => {
-                let sem_ref: &Semaphore = &*sem;
-                sem_ref.take();
+                let mut sem_ref: Option<&Semaphore> = None;
+                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+                    sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
+                });
 
-                ipc::TOPIC_REGISTERY_LOCK.take();
-                let msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
-                ipc::TOPIC_REGISTERY_LOCK.give();
+                sem_ref.unwrap().take();
+
+                let mut msg: Option<Vec<u8>> = None;
+                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+                    msg = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
+                });
                 msg
             },
             Err (_) => None,

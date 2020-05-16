@@ -96,4 +96,16 @@ impl TopicRegistry {
         }
         None
     }
+
+    pub(crate) fn get_subscriber_lock(&mut self, msg_topic: &str) -> Option<&Semaphore> {
+        let cur_pid: usize = unsafe { get_cur_task().pid };
+        for topic in &mut self.topic_lookup {
+            if topic.name == msg_topic {
+                if let Some(subscriber) = topic.subscribers.get_mut(&cur_pid) {
+                    return Some(&subscriber.lock);
+                }
+            }
+        }
+        None
+    }
 }

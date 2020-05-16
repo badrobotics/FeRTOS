@@ -1,13 +1,12 @@
 extern crate alloc;
 use crate::r#yield;
-use crate::semaphore::Semaphore;
 use alloc::vec::Vec;
 use cstr_core::{c_char, CString};
 
 extern "C" {
     fn ipc_publish(topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize;
-    fn ipc_subscribe(topic: *const c_char) -> *const Semaphore;
-    fn ipc_get_message(topic: *const c_char, sem: *const Semaphore) -> Message;
+    fn ipc_subscribe(topic: *const c_char) -> usize;
+    fn ipc_get_message(topic: *const c_char) -> Message;
 }
 
 #[repr(C)]
@@ -58,26 +57,24 @@ impl Publisher {
 
 pub struct Subscriber {
     pub topic: CString,
-    sem: *const Semaphore,
 }
 
 impl Subscriber {
     pub fn new(topic: &str) -> Result<Self, &'static str> {
         let c_topic = CString::new(topic).unwrap();
-        let sem = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
-        if sem.is_null() {
+        let resp = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
+        if resp == 1 {
             Err("Failed to subscribe to topic.")
         } else {
             Ok(Subscriber {
                 topic: c_topic,
-                sem,
             })
         }
     }
 
     pub fn get_message(&mut self) -> Option<Vec<u8>> {
         let message: Message = unsafe {
-            ipc_get_message((&self.topic).as_ptr(), self.sem)
+            ipc_get_message((&self.topic).as_ptr())
         };
         if message.valid {
             Some(message.into())
