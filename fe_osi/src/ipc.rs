@@ -35,9 +35,12 @@ pub struct Publisher {
 }
 
 impl Publisher {
-    pub fn new(topic: &str) -> Self {
-        let c_topic = CString::new(topic).unwrap();
-        Publisher { topic: c_topic }
+    pub fn new(topic: &str) -> Result<Self, &'static str> {
+        let c_topic = match CString::new(topic) {
+            Ok(t) => t,
+            Err(_) => return Err("Invalid topic string")
+        };
+        Ok(Publisher { topic: c_topic })
     }
 
     pub fn publish(&mut self, mut message: Vec<u8>) -> Result<(), &'static str>{
@@ -61,7 +64,11 @@ pub struct Subscriber {
 
 impl Subscriber {
     pub fn new(topic: &str) -> Result<Self, &'static str> {
-        let c_topic = CString::new(topic).unwrap();
+        let c_topic = match CString::new(topic) {
+            Ok(t) => t,
+            Err(_) => return Err("Invalid topic string")
+        };
+ 
         let resp = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
         if resp == 1 {
             Err("Failed to subscribe to topic.")
