@@ -16,8 +16,17 @@ fn hello_task(_ : &mut usize) {
     let mut stdout = fe_osi::ipc::Publisher::new("stdout");
     let mut counter = 0;
     loop {
+<<<<<<< HEAD
         let msg = alloc::format!("Hello, World! {} {:X}\r\n", counter, fe_osi::allocator::get_heap_remaining()).into_bytes();
         stdout.publish(msg).unwrap();
+=======
+        let msg = alloc::format!("Hello, World! {}\r\n", counter).into_bytes();
+        lock.with_lock(|| {
+            for c in &msg {
+                write_byte(*c);
+            }
+        });
+>>>>>>> master
         counter += 1;
     }
 }
@@ -25,11 +34,22 @@ fn hello_task(_ : &mut usize) {
 fn writer_task(_ : &mut usize) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
+<<<<<<< HEAD
         if let Some(message) = subscriber.get_message() {
             for c in message {
                 write_byte(c);
             }
         }
+=======
+        let msg = alloc::format!("Welcome to FeRTOS! {}\r\n", counter).into_bytes();
+        lock.with_lock(|| {
+            for c in &msg {
+                write_byte(*c);
+            }
+        });
+        counter += 1;
+        fe_osi::sleep(10);
+>>>>>>> master
     }
 }
 
