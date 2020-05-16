@@ -11,6 +11,13 @@ pub struct LayoutFFI {
 extern "C" {
     fn do_alloc(layout: LayoutFFI) -> *mut u8;
     fn do_dealloc(ptr: *mut u8, layout: LayoutFFI) -> usize;
+    fn do_get_heap_remaining() -> usize;
+}
+
+pub fn get_heap_remaining() -> usize {
+    unsafe {
+        do_get_heap_remaining()
+    }
 }
 
 unsafe impl GlobalAlloc for FeAllocator {
@@ -32,6 +39,6 @@ unsafe impl GlobalAlloc for FeAllocator {
 }
 
 #[alloc_error_handler]
-fn error_handler(_: Layout) -> ! {
+fn error_handler(_layout: Layout) -> ! {
     loop {}
 }

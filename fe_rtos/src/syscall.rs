@@ -155,3 +155,8 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore)
         }
     }
 }
+
+#[no_mangle]
+extern "C" fn sys_get_heap_remaining() -> usize {
+    fe_alloc::get_heap_remaining()
+}

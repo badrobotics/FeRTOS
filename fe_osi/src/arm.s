@@ -10,6 +10,7 @@
     .global ipc_publish
     .global ipc_subscribe
     .global ipc_get_message
+    .global do_get_heap_remaining
 
     .thumb_func
 do_exit:
@@ -69,4 +70,10 @@ ipc_subscribe:
 ipc_get_message:
     PUSH { LR }
     svc 0x9
+    POP { PC }
+
+    .thumb_func
+do_get_heap_remaining:
+    PUSH { LR }
+    svc 0xa
     POP { PC }
