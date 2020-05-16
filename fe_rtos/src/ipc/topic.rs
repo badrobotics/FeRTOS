@@ -4,18 +4,15 @@ use core::cell::RefCell;
 use crate::ipc::subscriber::Subscriber;
 use crate::ipc::subscriber::MessageNode;
 use alloc::sync::Arc;
-use alloc::string::String;
 
 pub(crate) struct Topic {
-    pub(crate) name: String,
     pub(crate) tail: Option<Arc<MessageNode>>,
     pub(crate) subscribers: BTreeMap<usize, Subscriber>,
 }
 
 impl Topic {
-    pub(crate) fn new(name: &str) -> Topic {
+    pub(crate) fn new() -> Topic {
         Topic {
-            name: String::from(name),
             tail: None,
             subscribers: BTreeMap::new(),
         }

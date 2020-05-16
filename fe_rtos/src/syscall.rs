@@ -153,10 +153,8 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Messag
 
         if block {
             sem_ref.unwrap().take();
-        } else {
-            if !sem_ref.unwrap().try_take() {
-                return get_null_message();
-            }
+        } else if !sem_ref.unwrap().try_take() {
+            return get_null_message();
         }
 
         let mut message: Option<Vec<u8>> = None;
