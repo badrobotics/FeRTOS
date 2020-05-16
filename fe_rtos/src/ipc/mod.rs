@@ -42,38 +42,26 @@ impl<'a> TopicRegistry<'a> {
         msg_topic: &str,
     ) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
-        match self.topic_lookup.get_mut(msg_topic) {
-            Some(topic) => {
-                match topic.subscribers.get_mut(&cur_pid) {
-                    Some(subscriber) => {
-                        let next_node : Arc<MessageNode> = match &subscriber.next_message {
-                            Some(m) => Arc::clone(&m),
-                            None => return None,
-                        };
-                        subscriber.next_message = match &*next_node.next.borrow() {
-                            Some(m) => Some(Arc::clone(&m)),
-                            None => None,
-                        };
-                        Some(next_node.data.clone())
-                    },
-                    None => None
-                }
-            }
-            None => None
-        }
+
+        self.topic_lookup.get_mut(msg_topic)
+            .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
+            .and_then(|subscriber| {
+                let next_node : Arc<MessageNode> = match &subscriber.next_message {
+                    Some(m) => Arc::clone(&m),
+                    None => return None,
+                };
+                subscriber.next_message = match &*next_node.next.borrow() {
+                    Some(m) => Some(Arc::clone(&m)),
+                    None => None,
+                };
+                Some(next_node.data.clone())
+            })
    }
 
     pub(crate) fn get_subscriber_lock(&mut self, msg_topic: &str) -> Option<&Semaphore> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
-
-        match self.topic_lookup.get_mut(msg_topic) {
-            Some(topic) => {
-                match topic.subscribers.get_mut(&cur_pid) {
-                    Some(subscriber) => Some(&subscriber.lock),
-                    None => None,
-                }
-            },
-            None => None,
-        }
+        self.topic_lookup.get_mut(msg_topic)
+            .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
+            .and_then(|subscriber| Some(&subscriber.lock))
     }
 }
