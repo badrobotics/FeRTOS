@@ -110,7 +110,10 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
                 ipc::TOPIC_REGISTERY_LOCK.give();
                 0
             },
-            Err(_) => 1
+            Err(_) => {
+                Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
+                1
+            },
         }
     }
 }
@@ -154,4 +157,9 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, sem: *const Semaphore)
             None => Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }, 
         }
     }
+}
+
+#[no_mangle]
+extern "C" fn sys_get_heap_remaining() -> usize {
+    fe_alloc::get_heap_remaining()
 }

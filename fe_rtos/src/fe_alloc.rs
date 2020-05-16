@@ -222,3 +222,7 @@ unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut
 
     data_ptr as *mut u8
 }
+
+pub fn get_heap_remaining() -> usize {
+    unsafe { HEAP_REMAINING }
+}

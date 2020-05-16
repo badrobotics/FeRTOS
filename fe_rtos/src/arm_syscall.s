@@ -10,8 +10,9 @@
     .weak sys_ipc_publish
     .weak sys_ipc_subscribe
     .weak sys_ipc_get_message
+    .weak sys_get_heap_remaining
     .global svc_handler
-.equ max_svc, 9
+.equ max_svc, 10
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arm Cortex-M interrupt stack frame order:
@@ -79,3 +80,4 @@ svc_addr_table:
     .word sys_ipc_publish     // 7
     .word sys_ipc_subscribe   // 8
     .word sys_ipc_get_message // 9
+    .word sys_get_heap_remaining // 10
