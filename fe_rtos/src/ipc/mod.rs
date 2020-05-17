@@ -62,12 +62,12 @@ impl<'a> TopicRegistry<'a> {
         self.topic_lookup
             .get_mut(msg_topic)
             .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
-            .and_then(|subscriber| Some(&subscriber.lock))
+            .map(|subscriber| &subscriber.lock)
     }
 
     pub(crate) fn get_topic_lock(&mut self, topic_name: &str) -> Option<&Semaphore> {
         self.topic_lookup
             .get_mut(topic_name)
-            .and_then(|topic| Some(&topic.lock))
+            .map(|topic| &topic.lock)
     }
 }
