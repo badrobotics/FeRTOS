@@ -2,14 +2,14 @@ mod subscriber;
 mod topic;
 
 extern crate alloc;
-use crate::ipc::subscriber::Subscriber;
 use crate::ipc::subscriber::MessageNode;
+use crate::ipc::subscriber::Subscriber;
 use crate::ipc::topic::Topic;
+use crate::task::get_cur_task;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
 use fe_osi::semaphore::Semaphore;
-use crate::task::get_cur_task;
 
 pub(crate) struct TopicRegistry<'a> {
     pub(crate) topic_lookup: BTreeMap<&'a str, Topic>,
@@ -22,7 +22,8 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
 
 impl<'a> TopicRegistry<'a> {
     pub(crate) fn publish_to_topic(&mut self, message_topic: &'a str, message: &[u8]) {
-        self.topic_lookup.entry(message_topic)
+        self.topic_lookup
+            .entry(message_topic)
             .and_modify(|topic| topic.add_message(message));
     }
 
@@ -37,16 +38,14 @@ impl<'a> TopicRegistry<'a> {
             .add_subscriber(pid, subscriber);
     }
 
-    pub(crate) fn get_ipc_message(
-        &mut self,
-        msg_topic: &str,
-    ) -> Option<Vec<u8>> {
+    pub(crate) fn get_ipc_message(&mut self, msg_topic: &str) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
 
-        self.topic_lookup.get_mut(msg_topic)
+        self.topic_lookup
+            .get_mut(msg_topic)
             .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
             .and_then(|subscriber| {
-                let next_node : Arc<MessageNode> = match &subscriber.next_message {
+                let next_node: Arc<MessageNode> = match &subscriber.next_message {
                     Some(m) => Arc::clone(&m),
                     None => return None,
                 };
@@ -56,12 +55,19 @@ impl<'a> TopicRegistry<'a> {
                 };
                 Some(next_node.data.clone())
             })
-   }
+    }
 
     pub(crate) fn get_subscriber_lock(&mut self, msg_topic: &str) -> Option<&Semaphore> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
-        self.topic_lookup.get_mut(msg_topic)
+        self.topic_lookup
+            .get_mut(msg_topic)
             .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
             .and_then(|subscriber| Some(&subscriber.lock))
+    }
+
+    pub(crate) fn get_topic_lock(&mut self, topic_name: &str) -> Option<&Semaphore> {
+        self.topic_lookup
+            .get_mut(topic_name)
+            .and_then(|topic| Some(&topic.lock))
     }
 }

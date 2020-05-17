@@ -1,13 +1,15 @@
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use core::cell::RefCell;
-use crate::ipc::subscriber::Subscriber;
 use crate::ipc::subscriber::MessageNode;
+use crate::ipc::subscriber::Subscriber;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use core::cell::RefCell;
+use fe_osi::semaphore::Semaphore;
 
 pub(crate) struct Topic {
     pub(crate) tail: Option<Arc<MessageNode>>,
     pub(crate) subscribers: BTreeMap<usize, Subscriber>,
+    pub(crate) lock: Semaphore,
 }
 
 impl Topic {
@@ -15,6 +17,7 @@ impl Topic {
         Topic {
             tail: None,
             subscribers: BTreeMap::new(),
+            lock: Semaphore::new_mutex(),
         }
     }
 
@@ -28,7 +31,7 @@ impl Topic {
         match &self.tail {
             Some(m) => {
                 m.next.replace(Some(Arc::clone(&new_tail)));
-            },
+            }
             None => (),
         };
         // Point tail to the end of the list

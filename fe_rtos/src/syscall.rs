@@ -102,34 +102,43 @@ extern "C" fn sys_yield() -> usize {
 #[no_mangle]
 extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize {
     unsafe {
-        match CStr::from_ptr(c_topic).to_str() {
-            Ok(topic) => {
-                let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
-                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
-                    ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
-                });
-                0
-            },
+        let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
+
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
             Err(_) => {
+                // Invalid topic string. Create vector so the compiler can dealloc
                 Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
-                1
-            },
-        }
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
+        });
+        0
     }
 }
 
 #[no_mangle]
 extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
     unsafe {
-        match CStr::from_ptr(c_topic).to_str() {
-            Ok(topic) => {
-                ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
-                    ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
-                });
-                0
-            },
-            Err(_) => 1
-        }
+        let mut topic_lock: Option<&Semaphore> = None;
+
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
+            Err(_) => {
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            topic_lock = ipc::TOPIC_REGISTERY.get_topic_lock(topic);
+            ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
+        });
+        0
     }
 }
 
