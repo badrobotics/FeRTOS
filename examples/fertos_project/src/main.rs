@@ -2,19 +2,19 @@
 #![no_main]
 
 mod cmd;
-mod uart_server;
 mod stdio;
+mod uart_server;
 
 #[macro_use]
 extern crate alloc;
 
 use alloc::boxed::Box;
+use cortex_m::peripheral::scb::Exception;
 use hal::prelude::*;
-#[cfg(feature = "tm4c1294")]
-use tm4c129x_hal as hal;
 #[cfg(feature = "tm4c123")]
 use tm4c123x_hal as hal;
-use cortex_m::peripheral::scb::Exception;
+#[cfg(feature = "tm4c1294")]
+use tm4c129x_hal as hal;
 
 #[cfg(feature = "tm4c1294")]
 fn get_oscillator() -> hal::sysctl::Oscillator {
@@ -81,10 +81,9 @@ fn main() -> ! {
         Some(Box::new(uart0_rx)),
     );
 
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::stdout, None);
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::stdin, None);
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::hello_world, None);
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::cmd, None);
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, stdio::stdout, None);
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, stdio::stdin, None);
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::shell, None);
 
     // Start the FeRTOS scheduler
     let reload_val: u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
