@@ -8,5 +8,9 @@ edition = "2018"
 
 [dependencies]
 
+[dependencies.cstr_core]
+version = "0.1.2"
+features = ["alloc"]
+
 [build-dependencies]
 cc = "1.0.25"

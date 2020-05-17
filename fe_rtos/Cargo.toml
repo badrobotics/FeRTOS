@@ -17,5 +17,9 @@ features = ["alloc"]
 version = "1.4.0"
 features = ["spin_no_std"]
 
+[dependencies.cstr_core]
+version = "0.1.2"
+features = ["alloc"]
+
 [build-dependencies]
 cc = "1.0.25"

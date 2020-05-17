@@ -1,10 +1,14 @@
 extern crate alloc;
 
-use alloc::boxed::Box;
-use crate::task;
 use crate::fe_alloc;
+use crate::task;
+use crate::ipc;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::semaphore::Semaphore;
+use fe_osi::ipc::Message;
+use cstr_core::{CStr, c_char};
 
 extern "C" {
     pub fn svc_handler();
@@ -51,9 +55,14 @@ extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI)  -> usize {
 #[no_mangle]
 extern "C" fn sys_block(sem: *const Semaphore) -> usize {
     while !task::block(sem) {
-        sys_yield();
+        unsafe {
+            if (*sem).is_available() {
+                break;
+            } else {
+                sys_yield();
+            }
+        }
     }
-
     0
 }
 
@@ -74,4 +83,85 @@ extern "C" fn sys_yield() -> usize {
     unsafe { task::do_context_switch(); }
 
     0
+}
+
+#[no_mangle]
+extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize {
+    unsafe {
+        let msg_vec = Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
+
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
+            Err(_) => {
+                // Invalid topic string. Create vector so the compiler can dealloc
+                Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            ipc::TOPIC_REGISTERY.publish_to_topic(topic, &msg_vec);
+        });
+        0
+    }
+}
+
+#[no_mangle]
+extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
+    unsafe {
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
+            Err(_) => {
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
+        });
+        0
+    }
+}
+
+fn get_null_message() -> Message {
+    Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }
+}
+
+#[no_mangle]
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Message { 
+    let mut sem_ref: Option<&Semaphore> = None;
+    unsafe {
+
+        let topic = match CStr::from_ptr(c_topic).to_str() {
+            Ok(t) => t,
+            Err(_) => return get_null_message()
+        };
+        
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
+        });
+
+        if block {
+            sem_ref.unwrap().take();
+        } else if !sem_ref.unwrap().try_take() {
+            return get_null_message();
+        }
+
+        let mut message: Option<Vec<u8>> = None;
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            message = ipc::TOPIC_REGISTERY.get_ipc_message(topic);
+        });
+
+        match message {
+            Some(msg) => msg.into(),
+            None => get_null_message(),
+        }
+    }
+}
+
+#[no_mangle]
+extern "C" fn sys_get_heap_remaining() -> usize {
+    fe_alloc::get_heap_remaining()
 }

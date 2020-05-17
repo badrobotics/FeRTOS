@@ -38,7 +38,7 @@ pub (crate) struct Task {
     task_info: Option<Box<NewTaskInfo>>,
     state: TaskStateStruct,
     queued: AtomicBool,
-    pid: usize,
+    pub(crate) pid: usize,
 }
 
 unsafe impl Send for Task {}
@@ -105,6 +105,14 @@ unsafe fn scheduler() {
     //If a task is being currently being pushed by the kernel, run it so it can finish
     if PUSHING_TASK.load(Ordering::SeqCst) {
         NEXT_TASK = Some(Arc::clone(&default_task));
+        return;
+    }
+
+    let count = match &NEXT_TASK {
+        Some(task) => Arc::strong_count(&task),
+        None => 0xFF,
+    };
+    if count == 1 {
         return;
     }
 
@@ -327,6 +335,8 @@ fn kernel(_: &mut u32) {
                         PUSHING_TASK.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
                         PUSHING_TASK.store(false, Ordering::SeqCst);
+                    } else if SCHEDULER_QUEUE.is_empty() {
+                        task.queued.store(false, Ordering::SeqCst);
                     }
                 },
                 TaskState::Asleep(wake_up_ticks) => {

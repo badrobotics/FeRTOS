@@ -3,10 +3,7 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::boxed::Box;
 use cortex_m::peripheral::scb::Exception;
-use fe_osi::semaphore::Semaphore;
 
 fn write_byte(c : u8) {
     let uart0 : *mut usize = 0x4000_C000 as *mut usize;
@@ -15,7 +12,8 @@ fn write_byte(c : u8) {
     }
 }
 
-fn hello_task(lock : &mut Arc<Semaphore>) {
+fn hello_task(_ : &mut usize) {
+    let mut stdout = fe_osi::ipc::Publisher::new("stdout");
     let mut counter = 0;
     loop {
         let msg = alloc::format!("Hello, World! {}\r\n", counter).into_bytes();
@@ -25,12 +23,11 @@ fn hello_task(lock : &mut Arc<Semaphore>) {
             }
         });
         counter += 1;
-        fe_osi::sleep(10);
     }
 }
 
-fn welcome_task(lock : &mut Arc<Semaphore>) {
-    let mut counter = 0;
+fn writer_task(_ : &mut usize) {
+    let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
         let msg = alloc::format!("Welcome to FeRTOS! {}\r\n", counter).into_bytes();
         lock.with_lock(|| {
@@ -47,14 +44,12 @@ fn welcome_task(lock : &mut Arc<Semaphore>) {
 fn main() -> ! {
     let p = cortex_m::peripheral::Peripherals::take().unwrap();
 
-    let lock = Arc::new(Semaphore::new_mutex());
-
     fe_rtos::interrupt::int_register(Exception::SysTick.irqn(), fe_rtos::task::sys_tick);
     fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch);
     fe_rtos::interrupt::int_register(Exception::SVCall.irqn(), fe_rtos::syscall::svc_handler);
 
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, Some(Box::new(Arc::clone(&lock))));
-    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, welcome_task, Some(Box::new(lock)));
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, None);
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);
 
     //Start the FeRTOS scheduler
     let reload_val : u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;

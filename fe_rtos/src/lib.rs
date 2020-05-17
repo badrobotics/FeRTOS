@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(const_mut_refs)]
 #![feature(linked_list_remove)]
+#![feature(const_btree_new)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -10,6 +11,7 @@ mod fe_alloc;
 pub mod task;
 pub mod syscall;
 pub mod interrupt;
+pub mod ipc;
 
 use fe_alloc::KernelAllocator;
 

@@ -1,7 +1,9 @@
 #![no_std]
 #![feature(alloc_error_handler)]
+#![feature(vec_into_raw_parts)]
 
 pub mod allocator;
+pub mod ipc;
 pub mod semaphore;
 pub mod task;
 
