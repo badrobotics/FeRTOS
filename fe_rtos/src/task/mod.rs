@@ -12,16 +12,17 @@ use alloc::collections::LinkedList;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::mem::size_of;
+use core::ptr::null_mut;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crossbeam_queue::SegQueue;
-use fe_osi;
 use fe_osi::semaphore::Semaphore;
 
 #[repr(C)]
 union StackPtr {
-    reference: &'static u32,
-    ptr: *const u32,
-    num: u32,
+    reference: &'static usize,
+    ptr: *const usize,
+    num: usize,
 }
 
 #[repr(C)]
@@ -32,7 +33,7 @@ pub(crate) struct Task {
     //Holds the smart pointer to a dynamically allocated stack is applicable
     //It needs to be a smart type to easily allow for deallocation of the stack
     //if a task is deleted
-    dynamic_stack: Vec<u32>,
+    dynamic_stack: Vec<usize>,
     //Stores the param of the task if it was created with the task_spawn syscall
     //This will be a raw pointer to a Box that will need to be freed
     task_info: Option<Box<NewTaskInfo>>,
@@ -49,10 +50,10 @@ pub(crate) struct NewTaskInfo {
     pub param: *mut u32,
 }
 
-const INIT_XPSR: u32 = 0x01000000;
+const INIT_XPSR: usize = 0x01000000;
 pub const DEFAULT_STACK_SIZE: usize = 1024;
 
-static mut KERNEL_STACK: [u32; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
+static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
 static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
 static mut PLACEHOLDER_TASK: Task = Task {
@@ -67,8 +68,8 @@ static mut KERNEL_TASK: Option<Arc<Task>> = None;
 static mut NEXT_TASK: Option<Arc<Task>> = None;
 static mut CUR_TASK: &mut Task = unsafe { &mut PLACEHOLDER_TASK };
 lazy_static! {
-    static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = { SegQueue::new() };
-    static ref SCHEDULER_QUEUE: SegQueue<Arc<Task>> = { SegQueue::new() };
+    static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
+    static ref SCHEDULER_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
 }
 
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
@@ -178,40 +179,40 @@ pub(crate) fn block(sem: *const Semaphore) -> bool {
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
 unsafe fn set_initial_stack(
-    stack_ptr: *const u32,
-    entry_point: *const u32,
-    param: *mut u32,
-) -> *const u32 {
-    let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
+    stack_ptr: *const usize,
+    entry_point: *const usize,
+    param: *mut usize,
+) -> *const usize {
+    let mut cur_ptr = ((stack_ptr as usize) - size_of::<usize>()) as *mut usize;
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
-    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
 
     //Set the PC
-    *cur_ptr = entry_point as u32;
-    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+    *cur_ptr = entry_point as usize;
+    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
 
     //Set the LR
-    *cur_ptr = idle as u32;
-    cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+    *cur_ptr = idle as usize;
+    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
 
     for _i in 0..13 {
-        *cur_ptr = param as u32;
-        cur_ptr = (cur_ptr as u32 - 4) as *mut u32;
+        *cur_ptr = param as usize;
+        cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
     }
-    (cur_ptr as u32 + 4) as *const u32
+    (cur_ptr as usize + size_of::<usize>()) as *const usize
 }
 
 fn get_new_pid() -> usize {
     static PID: AtomicUsize = AtomicUsize::new(1);
-    return PID.fetch_add(1, Ordering::SeqCst);
+    PID.fetch_add(1, Ordering::SeqCst)
 }
 
 pub(crate) unsafe fn add_task(
     stack_size: usize,
-    entry_point: *const u32,
-    param: *mut u32,
+    entry_point: *const usize,
+    param: *mut usize,
 ) -> Arc<Task> {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
@@ -223,9 +224,9 @@ pub(crate) unsafe fn add_task(
     };
 
     //Convert the adress of the first element of the vector into a ptr for the stack
-    new_task.sp.ptr = &new_task.dynamic_stack[0] as *const u32;
+    new_task.sp.ptr = &new_task.dynamic_stack[0] as *const usize;
     //Arm uses a full descending stack so we have to start from the top
-    new_task.sp.num += 4 * (stack_size as u32);
+    new_task.sp.num += size_of::<usize>() * (stack_size as usize);
 
     new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param);
 
@@ -237,10 +238,10 @@ pub(crate) unsafe fn add_task(
 }
 
 pub(crate) unsafe fn add_task_static(
-    stack_ptr: &'static u32,
+    stack_ptr: &'static usize,
     stack_size: usize,
-    entry_point: *const u32,
-    param: Option<*mut u32>,
+    entry_point: *const usize,
+    param: Option<*mut usize>,
 ) -> Arc<Task> {
     let mut new_task = Task {
         sp: StackPtr {
@@ -254,10 +255,10 @@ pub(crate) unsafe fn add_task_static(
     };
 
     //Arm uses a full descending stack so we have to start from the top
-    new_task.sp.num += 4 * (stack_size as u32);
+    new_task.sp.num += size_of::<usize>() * (stack_size as usize);
     let param_ptr = match param {
-        Some(p) => p as *mut u32,
-        None => 0 as *mut u32,
+        Some(p) => p as *mut usize,
+        None => null_mut(),
     };
 
     new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param_ptr);
@@ -304,7 +305,7 @@ pub fn start_scheduler(
         let kernel_task_ref = add_task_static(
             &KERNEL_STACK[0],
             DEFAULT_STACK_SIZE,
-            kernel as *const u32,
+            kernel as *const usize,
             None,
         );
         //Add something to the scheduler queue so something can run right away
@@ -359,7 +360,7 @@ fn kernel(_: &mut u32) {
 
             match task_state {
                 TaskState::Runnable => {
-                    if task.queued.compare_and_swap(false, true, Ordering::SeqCst) == false {
+                    if !task.queued.compare_and_swap(false, true, Ordering::SeqCst) {
                         PUSHING_TASK.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
                         PUSHING_TASK.store(false, Ordering::SeqCst);

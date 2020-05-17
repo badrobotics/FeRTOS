@@ -31,7 +31,7 @@ pub fn int_register(irqn: i8, int_handler: unsafe extern "C" fn()) {
         }
 
         // Register callback to irqn
-        ptr::write(int_pos, int_handler as u32);
+        ptr::write(int_pos, int_handler as usize as u32);
     }
 }
 
