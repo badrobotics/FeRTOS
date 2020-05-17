@@ -12,10 +12,5 @@ edition = "2018"
 version = "0.1.2"
 features = ["alloc"]
 
-[dependencies.crossbeam-queue]
-version = "0.2"
-default-features = false
-features = ["alloc"]
-
 [build-dependencies]
 cc = "1.0.25"
