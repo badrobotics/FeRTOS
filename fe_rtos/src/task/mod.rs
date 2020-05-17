@@ -7,8 +7,8 @@ mod tick;
 use crate::syscall;
 use crate::task::task_state::{TaskState, TaskStateStruct};
 use crate::task::tick::TickCounter;
-use alloc::collections::LinkedList;
 use alloc::boxed::Box;
+use alloc::collections::LinkedList;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -25,7 +25,7 @@ union StackPtr {
 }
 
 #[repr(C)]
-pub (crate) struct Task {
+pub(crate) struct Task {
     //Stack pointer
     sp: StackPtr,
     //Entry point into task
@@ -44,7 +44,7 @@ pub (crate) struct Task {
 unsafe impl Send for Task {}
 unsafe impl Sync for Task {}
 
-pub (crate) struct NewTaskInfo {
+pub(crate) struct NewTaskInfo {
     pub ep: *const u32,
     pub param: *mut u32,
 }
@@ -78,17 +78,17 @@ extern "C" {
 }
 
 #[no_mangle]
-pub (crate) unsafe extern "C" fn get_cur_task() -> &'static Task {
+pub(crate) unsafe extern "C" fn get_cur_task() -> &'static Task {
     CUR_TASK
 }
 
 #[no_mangle]
-pub (crate) unsafe extern "C" fn set_cur_task(new_val: &'static mut Task) {
+pub(crate) unsafe extern "C" fn set_cur_task(new_val: &'static mut Task) {
     CUR_TASK = new_val;
 }
 
 #[no_mangle]
-pub (crate) unsafe extern "C" fn get_next_task() -> &'static Task {
+pub(crate) unsafe extern "C" fn get_next_task() -> &'static Task {
     match &NEXT_TASK {
         Some(task) => task,
         None => &PLACEHOLDER_TASK,
@@ -127,19 +127,19 @@ unsafe fn scheduler() {
             match task_state {
                 TaskState::Runnable => {
                     NEXT_TASK = Some(Arc::clone(&task));
-                },
+                }
                 _ => {
                     NEXT_TASK = Some(Arc::clone(&default_task));
-                },
+                }
             }
-        },
+        }
         Err(_) => {
             NEXT_TASK = Some(Arc::clone(&default_task));
-        },
+        }
     }
 }
 
-pub (crate) unsafe fn do_context_switch() {
+pub(crate) unsafe fn do_context_switch() {
     super::disable_interrupts();
     scheduler();
     super::enable_interrupts();
@@ -153,9 +153,11 @@ pub unsafe extern "C" fn sys_tick() {
 
 //Puts the currently running thread to sleep for at least the specified number
 //of ticks
-pub (crate) fn sleep(sleep_ticks: u64) -> bool{
+pub(crate) fn sleep(sleep_ticks: u64) -> bool {
     unsafe {
-        let ret_val = CUR_TASK.state.try_set(TaskState::Asleep(TICKS.get() + sleep_ticks));
+        let ret_val = CUR_TASK
+            .state
+            .try_set(TaskState::Asleep(TICKS.get() + sleep_ticks));
         //Trigger a context switch and wait until that happens
         do_context_switch();
 
@@ -165,7 +167,7 @@ pub (crate) fn sleep(sleep_ticks: u64) -> bool{
 
 //Has the currently running thread block until the semaphore it's blocking on
 //is available
-pub (crate) fn block(sem: *const Semaphore) -> bool{
+pub(crate) fn block(sem: *const Semaphore) -> bool {
     unsafe {
         let ret_val = CUR_TASK.state.try_set(TaskState::Blocking(sem));
         do_context_switch();
@@ -175,7 +177,11 @@ pub (crate) fn block(sem: *const Semaphore) -> bool{
 }
 
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(stack_ptr: *const u32, entry_point: *const u32, param: *mut u32) -> *const u32 {
+unsafe fn set_initial_stack(
+    stack_ptr: *const u32,
+    entry_point: *const u32,
+    param: *mut u32,
+) -> *const u32 {
     let mut cur_ptr = ((stack_ptr as u32) - 4) as *mut u32;
 
     //Set the xPSR
@@ -202,7 +208,11 @@ fn get_new_pid() -> usize {
     return PID.fetch_add(1, Ordering::SeqCst);
 }
 
-pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param: *mut u32,) -> Arc<Task> {
+pub(crate) unsafe fn add_task(
+    stack_size: usize,
+    entry_point: *const u32,
+    param: *mut u32,
+) -> Arc<Task> {
     let mut new_task = Task {
         sp: StackPtr { num: 0 },
         dynamic_stack: vec![0; stack_size],
@@ -226,9 +236,16 @@ pub (crate) unsafe fn add_task(stack_size: usize, entry_point: *const u32, param
     task_ref
 }
 
-pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize, entry_point: *const u32, param: Option<*mut u32>) -> Arc<Task> {
+pub(crate) unsafe fn add_task_static(
+    stack_ptr: &'static u32,
+    stack_size: usize,
+    entry_point: *const u32,
+    param: Option<*mut u32>,
+) -> Arc<Task> {
     let mut new_task = Task {
-        sp: StackPtr { reference: stack_ptr, },
+        sp: StackPtr {
+            reference: stack_ptr,
+        },
         dynamic_stack: Vec::new(),
         task_info: None,
         state: TaskStateStruct::new(),
@@ -240,7 +257,7 @@ pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize
     new_task.sp.num += 4 * (stack_size as u32);
     let param_ptr = match param {
         Some(p) => p as *mut u32,
-        None => 0 as *mut u32
+        None => 0 as *mut u32,
     };
 
     new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param_ptr);
@@ -255,9 +272,9 @@ pub (crate) unsafe fn add_task_static(stack_ptr: &'static u32, stack_size: usize
 //This function is called by the task spawn syscall.
 //This function handles cleaning up after a task when
 //it returns
-pub (crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
-    let task_param : &u32 = unsafe { &*task_info.param };
-    let task_ep : fn(&u32) = unsafe { core::mem::transmute(task_info.ep) };
+pub(crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
+    let task_param: &u32 = unsafe { &*task_info.param };
+    let task_ep: fn(&u32) = unsafe { core::mem::transmute(task_info.ep) };
     let task = unsafe { &mut CUR_TASK };
 
     task.task_info = Some(task_info);
@@ -266,10 +283,10 @@ pub (crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
 
     fe_osi::exit();
 
-    loop{}
+    loop {}
 }
 
-pub (crate) unsafe fn remove_task() -> bool {
+pub(crate) unsafe fn remove_task() -> bool {
     let ret_val = CUR_TASK.state.try_set(TaskState::Zombie);
     do_context_switch();
 
@@ -284,7 +301,12 @@ pub fn start_scheduler(
     syscall::link_syscalls();
 
     unsafe {
-        let kernel_task_ref = add_task_static(&KERNEL_STACK[0], DEFAULT_STACK_SIZE, kernel as *const u32, None);
+        let kernel_task_ref = add_task_static(
+            &KERNEL_STACK[0],
+            DEFAULT_STACK_SIZE,
+            kernel as *const u32,
+            None,
+        );
         //Add something to the scheduler queue so something can run right away
         kernel_task_ref.queued.store(true, Ordering::SeqCst);
         KERNEL_TASK = Some(Arc::clone(&kernel_task_ref));
@@ -294,7 +316,9 @@ pub fn start_scheduler(
 
     unsafe {
         let mut peripherals = cortex_m::Peripherals::steal();
-        peripherals.SCB.set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
+        peripherals
+            .SCB
+            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
     }
 
     //Basically, wait for the scheduler to start
@@ -317,8 +341,12 @@ fn kernel(_: &mut u32) {
         //Add all new tasks to the task list
         while !NEW_TASK_QUEUE.is_empty() {
             match NEW_TASK_QUEUE.pop() {
-                Ok(new_task) => { task_list.push_back(new_task); }
-                Err(_) => { break; },
+                Ok(new_task) => {
+                    task_list.push_back(new_task);
+                }
+                Err(_) => {
+                    break;
+                }
             }
         }
 
@@ -338,7 +366,7 @@ fn kernel(_: &mut u32) {
                     } else if SCHEDULER_QUEUE.is_empty() {
                         task.queued.store(false, Ordering::SeqCst);
                     }
-                },
+                }
                 TaskState::Asleep(wake_up_ticks) => {
                     unsafe {
                         //If this task is asleep, see if we should wake it up
@@ -361,7 +389,7 @@ fn kernel(_: &mut u32) {
                 TaskState::Zombie => {
                     delete_task = true;
                     deleted_task_num = task_num;
-                },
+                }
             }
 
             if has_new_state {
@@ -382,16 +410,20 @@ fn kernel(_: &mut u32) {
             match &removed_task.task_info {
                 Some(info) => {
                     if !info.param.is_null() {
-                        unsafe { core::mem::drop(Box::from_raw(info.param)); }
+                        unsafe {
+                            core::mem::drop(Box::from_raw(info.param));
+                        }
                     }
-                },
+                }
                 None => (),
             }
         }
 
         //Going through the loop multiple times without anything else running is
         //useless since their states will not have changed, so do a context switch
-        unsafe { do_context_switch(); }
+        unsafe {
+            do_context_switch();
+        }
     }
 }
 

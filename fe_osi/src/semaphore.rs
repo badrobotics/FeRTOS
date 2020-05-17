@@ -15,14 +15,14 @@ impl Semaphore {
     pub const fn new(start_count: usize) -> Semaphore {
         Semaphore {
             count: AtomicUsize::new(start_count),
-            mutex: false
+            mutex: false,
         }
     }
 
     pub const fn new_mutex() -> Semaphore {
         Semaphore {
             count: AtomicUsize::new(1),
-            mutex: true
+            mutex: true,
         }
     }
 
@@ -42,7 +42,11 @@ impl Semaphore {
                 continue;
             }
 
-            if self.count.compare_and_swap(old_val, old_val - 1, Ordering::SeqCst) == old_val {
+            if self
+                .count
+                .compare_and_swap(old_val, old_val - 1, Ordering::SeqCst)
+                == old_val
+            {
                 break;
             }
         }
@@ -55,7 +59,9 @@ impl Semaphore {
             return false;
         }
 
-        self.count.compare_and_swap(old_val, old_val - 1, Ordering::SeqCst) == old_val
+        self.count
+            .compare_and_swap(old_val, old_val - 1, Ordering::SeqCst)
+            == old_val
     }
 
     pub fn give(&self) {
@@ -66,13 +72,13 @@ impl Semaphore {
         }
     }
 
-    pub fn with_lock<F : FnMut()>(&self, mut f : F) {
+    pub fn with_lock<F: FnMut()>(&self, mut f: F) {
         self.take();
         f();
         self.give();
     }
 
-    pub fn try_with_lock<F : FnMut()>(&self, mut f : F) -> bool {
+    pub fn try_with_lock<F: FnMut()>(&self, mut f: F) -> bool {
         if self.try_take() {
             f();
             self.give();

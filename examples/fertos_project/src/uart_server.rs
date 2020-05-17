@@ -1,7 +1,7 @@
-use embedded_hal::serial::{Read as SerialRead, Write as SerialWrite};
-use core::fmt::Write;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt::Write;
+use embedded_hal::serial::{Read as SerialRead, Write as SerialWrite};
 
 pub fn uart_transmit_server<T: SerialWrite<u8> + Write>(serial: &mut T) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("uart_tx").unwrap();
