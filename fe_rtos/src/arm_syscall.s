@@ -65,6 +65,7 @@ svc_handler:
     //The new PC in the ISR stackframe is where we're jumping to
     STR R0, [SP, 0x18]
 
+    .thumb_func
 svc_handler_end:
     BX LR
 

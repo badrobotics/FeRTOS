@@ -16,7 +16,7 @@ extern "C" {
 
 //For the linker to link the syscalls, a function in this
 //file must be called from elsewhere...
-pub fn link_syscalls() {}
+pub fn link_syscalls(){}
 
 #[no_mangle]
 extern "C" fn sys_exit() -> usize {
@@ -42,16 +42,12 @@ extern "C" fn sys_sleep(ms32: u32) -> usize {
 
 #[no_mangle]
 extern "C" fn sys_alloc(layout: LayoutFFI) -> *mut u8 {
-    unsafe {
-        return fe_alloc::alloc(layout);
-    }
+    unsafe { return fe_alloc::alloc(layout); }
 }
 
 #[no_mangle]
-extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI) -> usize {
-    unsafe {
-        fe_alloc::dealloc(ptr, layout);
-    }
+extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI)  -> usize {
+    unsafe { fe_alloc::dealloc(ptr, layout); }
 
     0
 }
@@ -71,23 +67,13 @@ extern "C" fn sys_block(sem: *const Semaphore) -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_task_spawn(
-    stack_size: usize,
-    entry_point: *const u32,
-    parameter: *mut u32,
-) -> usize {
+extern "C" fn sys_task_spawn(stack_size: usize, entry_point: *const u32, parameter: *mut u32) -> usize {
     let task_info = Box::new(task::NewTaskInfo {
         ep: entry_point,
         param: parameter,
     });
 
-    unsafe {
-        task::add_task(
-            stack_size,
-            task::new_task_helper as *const u32,
-            Box::into_raw(task_info) as *mut u32,
-        );
-    }
+    unsafe { task::add_task(stack_size, task::new_task_helper as *const u32, Box::into_raw(task_info) as *mut u32); }
 
     0
 }
