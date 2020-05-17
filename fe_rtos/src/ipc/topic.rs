@@ -4,12 +4,10 @@ use crate::ipc::subscriber::Subscriber;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use core::cell::RefCell;
-use fe_osi::semaphore::Semaphore;
 
 pub(crate) struct Topic {
     pub(crate) tail: Option<Arc<MessageNode>>,
     pub(crate) subscribers: BTreeMap<usize, Subscriber>,
-    pub(crate) lock: Semaphore,
 }
 
 impl Topic {
@@ -17,7 +15,6 @@ impl Topic {
         Topic {
             tail: None,
             subscribers: BTreeMap::new(),
-            lock: Semaphore::new_mutex(),
         }
     }
 

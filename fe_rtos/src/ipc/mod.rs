@@ -2,8 +2,7 @@ mod subscriber;
 mod topic;
 
 extern crate alloc;
-use crate::ipc::subscriber::MessageNode;
-use crate::ipc::subscriber::Subscriber;
+use crate::ipc::subscriber::{MessageNode, Subscriber};
 use crate::ipc::topic::Topic;
 use crate::task::get_cur_task;
 use alloc::collections::BTreeMap;
@@ -63,11 +62,5 @@ impl<'a> TopicRegistry<'a> {
             .get_mut(msg_topic)
             .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
             .map(|subscriber| &subscriber.lock)
-    }
-
-    pub(crate) fn get_topic_lock(&mut self, topic_name: &str) -> Option<&Semaphore> {
-        self.topic_lookup
-            .get_mut(topic_name)
-            .map(|topic| &topic.lock)
     }
 }

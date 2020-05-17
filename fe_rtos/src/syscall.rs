@@ -110,8 +110,6 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
 #[no_mangle]
 extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
     unsafe {
-        let mut topic_lock: Option<&Semaphore> = None;
-
         let topic: &str = match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => topic,
             Err(_) => {
@@ -121,7 +119,6 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
         };
 
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
-            topic_lock = ipc::TOPIC_REGISTERY.get_topic_lock(topic);
             ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
         });
         0
