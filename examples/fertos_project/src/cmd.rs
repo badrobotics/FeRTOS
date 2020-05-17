@@ -19,11 +19,7 @@ pub fn shell(_: &mut u8) {
             Some(index) => {
                 let command: Vec<u8> = cmd_buffer.drain(..index + 1).collect();
                 if str::from_utf8(&command).unwrap() == "hello\r" {
-                    fe_osi::task::task_spawn(
-                        fe_rtos::task::DEFAULT_STACK_SIZE,
-                        hello_world,
-                        None,
-                    );
+                    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_world, None);
                 }
 
                 stdout.publish(prompt.clone().into_bytes());

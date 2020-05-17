@@ -1,14 +1,14 @@
 extern crate alloc;
 
 use crate::fe_alloc;
-use crate::task;
 use crate::ipc;
+use crate::task;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use cstr_core::{c_char, CStr};
 use fe_osi::allocator::LayoutFFI;
-use fe_osi::semaphore::Semaphore;
 use fe_osi::ipc::Message;
-use cstr_core::{CStr, c_char};
+use fe_osi::semaphore::Semaphore;
 
 extern "C" {
     pub fn svc_handler();
@@ -16,7 +16,7 @@ extern "C" {
 
 //For the linker to link the syscalls, a function in this
 //file must be called from elsewhere...
-pub fn link_syscalls(){}
+pub fn link_syscalls() {}
 
 #[no_mangle]
 extern "C" fn sys_exit() -> usize {
@@ -42,12 +42,16 @@ extern "C" fn sys_sleep(ms32: u32) -> usize {
 
 #[no_mangle]
 extern "C" fn sys_alloc(layout: LayoutFFI) -> *mut u8 {
-    unsafe { return fe_alloc::alloc(layout); }
+    unsafe {
+        return fe_alloc::alloc(layout);
+    }
 }
 
 #[no_mangle]
-extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI)  -> usize {
-    unsafe { fe_alloc::dealloc(ptr, layout); }
+extern "C" fn sys_dealloc(ptr: *mut u8, layout: LayoutFFI) -> usize {
+    unsafe {
+        fe_alloc::dealloc(ptr, layout);
+    }
 
     0
 }
@@ -67,20 +71,32 @@ extern "C" fn sys_block(sem: *const Semaphore) -> usize {
 }
 
 #[no_mangle]
-extern "C" fn sys_task_spawn(stack_size: usize, entry_point: *const u32, parameter: *mut u32) -> usize {
+extern "C" fn sys_task_spawn(
+    stack_size: usize,
+    entry_point: *const u32,
+    parameter: *mut u32,
+) -> usize {
     let task_info = Box::new(task::NewTaskInfo {
         ep: entry_point,
         param: parameter,
     });
 
-    unsafe { task::add_task(stack_size, task::new_task_helper as *const u32, Box::into_raw(task_info) as *mut u32); }
+    unsafe {
+        task::add_task(
+            stack_size,
+            task::new_task_helper as *const u32,
+            Box::into_raw(task_info) as *mut u32,
+        );
+    }
 
     0
 }
 
 #[no_mangle]
 extern "C" fn sys_yield() -> usize {
-    unsafe { task::do_context_switch(); }
+    unsafe {
+        task::do_context_switch();
+    }
 
     0
 }
@@ -126,19 +142,22 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
 }
 
 fn get_null_message() -> Message {
-    Message { msg_ptr: core::ptr::null_mut(), msg_len: 0, valid: false }
+    Message {
+        msg_ptr: core::ptr::null_mut(),
+        msg_len: 0,
+        valid: false,
+    }
 }
 
 #[no_mangle]
-extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Message { 
+extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Message {
     let mut sem_ref: Option<&Semaphore> = None;
     unsafe {
-
         let topic = match CStr::from_ptr(c_topic).to_str() {
             Ok(t) => t,
-            Err(_) => return get_null_message()
+            Err(_) => return get_null_message(),
         };
-        
+
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
             sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
         });

@@ -48,7 +48,7 @@ unsafe impl GlobalAlloc for KernelAllocator {
     }
 }
 
-pub (crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
+pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     //If HEAP points to, we need to initialize the heap
     if (HEAP as usize) == 0 {
         init_heap();
@@ -79,7 +79,6 @@ pub (crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     while header_ptr < heap_max {
         let header_data = *(header_ptr as *const usize);
 
-
         if (header_data & ALLOC_MASK) == 0 && (header_data & SIZE_MASK) >= size_needed {
             data_ptr = alloc_block(header_ptr, size_needed, layout);
             break;
@@ -93,7 +92,7 @@ pub (crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     data_ptr
 }
 
-pub (crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
+pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     //Recover the block header from the aligned data pointer
     let header = if layout.align > size_of::<usize>() {
         //If the alignment was big enough, a pointer to the
@@ -131,7 +130,7 @@ pub (crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     //coalesce this block with adjacent free blocks if able
     let left_coalesce = !is_first && (prev_ftr_data & ALLOC_MASK) == 0;
     let right_coalesce = !is_last && (next_hdr_data & ALLOC_MASK) == 0;
-    let new_header = if  left_coalesce {
+    let new_header = if left_coalesce {
         header - (prev_ftr_data & SIZE_MASK)
     } else {
         header
@@ -188,7 +187,7 @@ unsafe fn init_heap() {
     super::enable_interrupts();
 }
 
-unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut u8{
+unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut u8 {
     let alloc_header = header_ptr as *mut usize;
     let alloc_footer = (header_ptr + size - size_of::<usize>()) as *mut usize;
     let old_size = *alloc_header & SIZE_MASK;

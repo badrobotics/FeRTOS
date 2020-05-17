@@ -20,7 +20,11 @@ impl From<Vec<u8>> for Message {
     fn from(mut item: Vec<u8>) -> Self {
         item.shrink_to_fit();
         let (msg_ptr, msg_len, _msg_cap) = item.into_raw_parts();
-        Message { msg_ptr, msg_len, valid: true}
+        Message {
+            msg_ptr,
+            msg_len,
+            valid: true,
+        }
     }
 }
 
@@ -38,17 +42,15 @@ impl Publisher {
     pub fn new(topic: &str) -> Result<Self, &'static str> {
         let c_topic = match CString::new(topic) {
             Ok(t) => t,
-            Err(_) => return Err("Invalid topic string")
+            Err(_) => return Err("Invalid topic string"),
         };
         Ok(Publisher { topic: c_topic })
     }
 
-    pub fn publish(&mut self, mut message: Vec<u8>) -> Result<(), &'static str>{
+    pub fn publish(&mut self, mut message: Vec<u8>) -> Result<(), &'static str> {
         message.shrink_to_fit();
         let (msg_ptr, msg_len, _msg_cap) = message.into_raw_parts();
-        let success = unsafe {
-            ipc_publish((&self.topic).as_ptr(), msg_ptr, msg_len)
-        };
+        let success = unsafe { ipc_publish((&self.topic).as_ptr(), msg_ptr, msg_len) };
         if success == 0 {
             r#yield();
             Ok(())
@@ -66,23 +68,19 @@ impl Subscriber {
     pub fn new(topic: &str) -> Result<Self, &'static str> {
         let c_topic = match CString::new(topic) {
             Ok(t) => t,
-            Err(_) => return Err("Invalid topic string")
+            Err(_) => return Err("Invalid topic string"),
         };
- 
+
         let resp = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
         if resp == 1 {
             Err("Failed to subscribe to topic.")
         } else {
-            Ok(Subscriber {
-                topic: c_topic,
-            })
+            Ok(Subscriber { topic: c_topic })
         }
     }
 
     fn get_message_base(&mut self, block: bool) -> Option<Vec<u8>> {
-        let message: Message = unsafe {
-            ipc_get_message((&self.topic).as_ptr(), block)
-        };
+        let message: Message = unsafe { ipc_get_message((&self.topic).as_ptr(), block) };
         if message.valid {
             Some(message.into())
         } else {

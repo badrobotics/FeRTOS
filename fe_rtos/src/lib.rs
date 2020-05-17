@@ -8,10 +8,10 @@ extern crate lazy_static;
 extern crate fe_osi;
 
 mod fe_alloc;
-pub mod task;
-pub mod syscall;
 pub mod interrupt;
 pub mod ipc;
+pub mod syscall;
+pub mod task;
 
 use fe_alloc::KernelAllocator;
 
@@ -23,5 +23,3 @@ extern "C" {
     fn disable_interrupts();
     fn enable_interrupts();
 }
-
-

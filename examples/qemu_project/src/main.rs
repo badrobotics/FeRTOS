@@ -5,14 +5,14 @@ extern crate alloc;
 
 use cortex_m::peripheral::scb::Exception;
 
-fn write_byte(c : u8) {
-    let uart0 : *mut usize = 0x4000_C000 as *mut usize;
+fn write_byte(c: u8) {
+    let uart0: *mut usize = 0x4000_C000 as *mut usize;
     unsafe {
         *uart0 = c as usize;
     }
 }
 
-fn hello_task(_ : &mut usize) {
+fn hello_task(_: &mut usize) {
     let mut stdout = fe_osi::ipc::Publisher::new("stdout");
     let mut counter = 0;
     loop {
@@ -26,7 +26,7 @@ fn hello_task(_ : &mut usize) {
     }
 }
 
-fn writer_task(_ : &mut usize) {
+fn writer_task(_: &mut usize) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
         let msg = alloc::format!("Welcome to FeRTOS! {}\r\n", counter).into_bytes();
@@ -52,7 +52,7 @@ fn main() -> ! {
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);
 
     //Start the FeRTOS scheduler
-    let reload_val : u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
+    let reload_val: u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
     fe_rtos::task::start_scheduler(cortex_m::peripheral::SCB::set_pendsv, p.SYST, reload_val);
 
     loop {}

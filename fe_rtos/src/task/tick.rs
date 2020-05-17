@@ -6,7 +6,7 @@ pub struct TickCounter {
 }
 
 impl TickCounter {
-    pub const fn new() -> Self{
+    pub const fn new() -> Self {
         TickCounter {
             lsb: AtomicU32::new(0),
             msb: AtomicU32::new(0),
@@ -19,7 +19,8 @@ impl TickCounter {
         //If there was overflow, increment the lsb
         if self.lsb.load(Ordering::SeqCst) < old_lsb {
             let old_msb = self.msb.load(Ordering::SeqCst);
-            self.msb.compare_and_swap(old_msb, old_msb + 1, Ordering::SeqCst);
+            self.msb
+                .compare_and_swap(old_msb, old_msb + 1, Ordering::SeqCst);
         }
     }
 
