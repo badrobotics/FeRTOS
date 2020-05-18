@@ -4,6 +4,7 @@
 extern crate alloc;
 
 use cortex_m::peripheral::scb::Exception;
+use fe_osi::allocator::get_heap_remaining;
 
 fn write_byte(c: u8) {
     let uart0: *mut usize = 0x4000_C000 as *mut usize;
@@ -13,15 +14,11 @@ fn write_byte(c: u8) {
 }
 
 fn hello_task(_: &mut usize) {
-    let mut stdout = fe_osi::ipc::Publisher::new("stdout");
+    let mut stdout = fe_osi::ipc::Publisher::new("stdout").unwrap();
     let mut counter = 0;
     loop {
-        let msg = alloc::format!("Hello, World! {}\r\n", counter).into_bytes();
-        lock.with_lock(|| {
-            for c in &msg {
-                write_byte(*c);
-            }
-        });
+        let msg = alloc::format!("Hello, World! {} {:X}\r\n", counter, get_heap_remaining()).into_bytes();
+        stdout.publish(msg).unwrap();
         counter += 1;
     }
 }
@@ -29,14 +26,11 @@ fn hello_task(_: &mut usize) {
 fn writer_task(_: &mut usize) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
-        let msg = alloc::format!("Welcome to FeRTOS! {}\r\n", counter).into_bytes();
-        lock.with_lock(|| {
-            for c in &msg {
-                write_byte(*c);
-            }
-        });
-        counter += 1;
-        fe_osi::sleep(10);
+        let msg = subscriber.get_message().unwrap();
+
+        for c in msg {
+            write_byte(c);
+        }
     }
 }
 
