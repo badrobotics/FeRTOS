@@ -26,7 +26,7 @@ impl TaskStateStruct {
     pub fn try_get(&self) -> Option<TaskState> {
         let mut ret_val = None;
 
-        if self.in_use.compare_and_swap(false, true, Ordering::SeqCst) == false {
+        if !self.in_use.compare_and_swap(false, true, Ordering::SeqCst) {
             ret_val = Some(*self.state.borrow());
             self.in_use.store(false, Ordering::SeqCst);
         }
@@ -35,7 +35,7 @@ impl TaskStateStruct {
     }
 
     pub fn try_set(&self, new_state: TaskState) -> bool {
-        if self.in_use.compare_and_swap(false, true, Ordering::SeqCst) == false {
+        if !self.in_use.compare_and_swap(false, true, Ordering::SeqCst) {
             self.state.replace(new_state);
             self.in_use.store(false, Ordering::SeqCst);
 

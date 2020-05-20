@@ -42,9 +42,7 @@ extern "C" fn sys_sleep(ms32: u32) -> usize {
 
 #[no_mangle]
 extern "C" fn sys_alloc(layout: LayoutFFI) -> *mut u8 {
-    unsafe {
-        return fe_alloc::alloc(layout);
-    }
+    unsafe { fe_alloc::alloc(layout) }
 }
 
 #[no_mangle]
@@ -84,8 +82,8 @@ extern "C" fn sys_task_spawn(
     unsafe {
         task::add_task(
             stack_size,
-            task::new_task_helper as *const u32,
-            Box::into_raw(task_info) as *mut u32,
+            task::new_task_helper as *const usize,
+            Box::into_raw(task_info) as *mut usize,
         );
     }
 
