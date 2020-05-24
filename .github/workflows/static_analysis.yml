@@ -1,0 +1,36 @@
+name: Static Analysis
+
+on: [push, pull_request]
+
+jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Add rustfmt
+      run: rustup component add rustfmt
+
+    - name: Check Format
+      run: cargo fmt -- --check
+      working-directory: ./fe_rtos
+
+    - name: Check Format
+      run: cargo fmt -- --check
+      working-directory: ./fe_osi
+
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Switch to Nightly
+      run: rustup default nightly && rustup update
+    - name: Install GCC
+      run: sudo apt-get update && sudo apt-get install gcc-arm-none-eabi
+    - name: Add Target M3
+      run: rustup target add thumbv7m-none-eabi
+    - name: Install clippy
+      run: rustup component add clippy
+    - name: Clippy Linting 
+      run: cargo clippy --verbose --target=thumbv7m-none-eabi -- -D warnings
+      working-directory: ./fe_rtos
