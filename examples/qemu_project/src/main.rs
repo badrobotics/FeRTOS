@@ -36,7 +36,7 @@ fn writer_task(_: &mut usize) {
 
 #[no_mangle]
 fn main() -> ! {
-    let p = cortex_m::peripheral::Peripherals::take().unwrap();
+    let mut p = cortex_m::peripheral::Peripherals::take().unwrap();
 
     fe_rtos::interrupt::int_register(Exception::SysTick.irqn(), fe_rtos::task::sys_tick);
     fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch);
@@ -45,9 +45,26 @@ fn main() -> ! {
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);
 
+    //It's probably a good idea to have the context switch be the lowest
+    //priority interrupt.
+    unsafe {
+        p.SCB
+            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
+    }
+
     //Start the FeRTOS scheduler
-    let reload_val: u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
-    fe_rtos::task::start_scheduler(cortex_m::peripheral::SCB::set_pendsv, p.SYST, reload_val);
+    let enable_systick = |reload: usize| {
+        p.SYST.set_reload(reload as u32);
+        p.SYST.clear_current();
+        p.SYST.enable_counter();
+        p.SYST.enable_interrupt();
+    };
+    let reload_val = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
+    fe_rtos::task::start_scheduler(
+        cortex_m::peripheral::SCB::set_pendsv,
+        enable_systick,
+        reload_val as usize,
+    );
 
     loop {}
 }
