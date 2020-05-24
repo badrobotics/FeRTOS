@@ -294,10 +294,10 @@ pub(crate) unsafe fn remove_task() -> bool {
     ret_val
 }
 
-pub fn start_scheduler(
+pub fn start_scheduler<F: FnOnce(usize)>(
     trigger_context_switch: fn(),
-    mut systick: cortex_m::peripheral::SYST,
-    reload_val: u32,
+    enable_systick: F,
+    reload_val: usize,
 ) {
     syscall::link_syscalls();
 
@@ -315,18 +315,7 @@ pub fn start_scheduler(
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
-    unsafe {
-        let mut peripherals = cortex_m::Peripherals::steal();
-        peripherals
-            .SCB
-            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
-    }
-
-    //Basically, wait for the scheduler to start
-    systick.set_reload(reload_val);
-    systick.clear_current();
-    systick.enable_counter();
-    systick.enable_interrupt();
+    enable_systick(reload_val);
 
     loop {}
 }

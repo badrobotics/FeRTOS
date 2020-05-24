@@ -35,7 +35,7 @@ fn get_oscillator() -> hal::sysctl::Oscillator {
 #[no_mangle]
 fn main() -> ! {
     let p = hal::Peripherals::take().unwrap();
-    let cp = hal::CorePeripherals::take().unwrap();
+    let mut cp = hal::CorePeripherals::take().unwrap();
 
     let mut sc = p.SYSCTL.constrain();
     sc.clock_setup.oscillator = get_oscillator();
@@ -85,9 +85,26 @@ fn main() -> ! {
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, stdio::stdin, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, cmd::shell, None);
 
-    // Start the FeRTOS scheduler
-    let reload_val: u32 = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
-    fe_rtos::task::start_scheduler(cortex_m::peripheral::SCB::set_pendsv, cp.SYST, reload_val);
+    //It's probably a good idea to have the context switch be the lowest
+    //priority interrupt.
+    unsafe {
+        cp.SCB
+            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
+    }
+
+    //Start the FeRTOS scheduler
+    let enable_systick = |reload: usize| {
+        cp.SYST.set_reload(reload as u32);
+        cp.SYST.clear_current();
+        cp.SYST.enable_counter();
+        cp.SYST.enable_interrupt();
+    };
+    let reload_val = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
+    fe_rtos::task::start_scheduler(
+        cortex_m::peripheral::SCB::set_pendsv,
+        enable_systick,
+        reload_val as usize,
+    );
 
     loop {}
 }

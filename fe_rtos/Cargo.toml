@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 fe_osi = { path = "../fe_osi" }
-cortex-m = "0.6"
 
 [dependencies.crossbeam-queue]
 version = "0.2"
@@ -20,6 +19,9 @@ features = ["spin_no_std"]
 [dependencies.cstr_core]
 version = "0.1.2"
 features = ["alloc"]
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m = "0.6"
 
 [build-dependencies]
 cc = "1.0.25"
