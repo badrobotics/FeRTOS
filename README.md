@@ -35,7 +35,8 @@ To add this crate to you project, simply open the project's Cargo.toml file and 
 
 To build and load a FeRTOS program using this crate to a microcontroller, you'll need the following programs:
 * OpenOCD
-* [gcc-arm-none-eabi cross compiller](https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads) (for the linker, assembler, and GDB)
+* gdb-multiarch
+* [gcc-arm-none-eabi cross compiller](https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads) (for the linker and assembler)
 
 FeRTOS depends on unstable rust features, so you must use the nightly rust compiler to build it.
 You can enable this by running `rustup default nightly`. To revert back to stable rust, run `rustup default stable`.
