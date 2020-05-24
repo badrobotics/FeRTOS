@@ -1,6 +1,7 @@
 extern crate alloc;
 
 use crate::fe_alloc;
+use crate::interrupt;
 use crate::ipc;
 use crate::task;
 use alloc::boxed::Box;
@@ -181,4 +182,10 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Messag
 #[no_mangle]
 extern "C" fn sys_get_heap_remaining() -> usize {
     fe_alloc::get_heap_remaining()
+}
+
+#[no_mangle]
+extern "C" fn sys_interrupt_register(irqn: isize, handler: *const usize) -> usize {
+    interrupt::int_register(irqn as i8, handler);
+    0
 }
