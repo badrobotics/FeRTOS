@@ -38,9 +38,9 @@ fn writer_task(_: &mut usize) {
 fn main() -> ! {
     let mut p = cortex_m::peripheral::Peripherals::take().unwrap();
 
-    fe_rtos::interrupt::int_register(Exception::SysTick.irqn(), fe_rtos::task::sys_tick);
-    fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch);
-    fe_rtos::interrupt::int_register(Exception::SVCall.irqn(), fe_rtos::syscall::svc_handler);
+    fe_rtos::interrupt::int_register(Exception::SysTick.irqn(), fe_rtos::task::sys_tick as *const usize);
+    fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch as *const usize);
+    fe_rtos::interrupt::int_register(Exception::SVCall.irqn(), fe_rtos::syscall::svc_handler as *const usize);
 
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);

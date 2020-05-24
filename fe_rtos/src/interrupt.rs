@@ -2,7 +2,7 @@ use core::panic::PanicInfo;
 use core::ptr;
 
 #[cfg(target_arch = "arm")]
-pub fn int_register(irqn: i8, int_handler: unsafe extern "C" fn()) {
+pub fn int_register(irqn: i8, int_handler: *const usize) {
     //This is defined in the linker script
     extern "C" {
         static mut _svtable: u32;

@@ -11,6 +11,7 @@
     .global ipc_subscribe
     .global ipc_get_message
     .global do_get_heap_remaining
+    .global do_register_interrupt
 
     .thumb_func
 do_exit:
@@ -76,4 +77,10 @@ ipc_get_message:
 do_get_heap_remaining:
     PUSH { LR }
     svc 0xa
+    POP { PC }
+
+    .thumb_func
+do_register_interrupt:
+    PUSH { LR }
+    svc 0xb
     POP { PC }

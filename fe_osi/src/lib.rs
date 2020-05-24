@@ -6,6 +6,7 @@ pub mod allocator;
 pub mod ipc;
 pub mod semaphore;
 pub mod task;
+pub mod interrupt;
 
 extern "C" {
     fn do_exit() -> usize;

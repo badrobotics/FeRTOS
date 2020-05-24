@@ -11,8 +11,9 @@
     .weak sys_ipc_subscribe
     .weak sys_ipc_get_message
     .weak sys_get_heap_remaining
+    .weak sys_interrupt_register
     .global svc_handler
-.equ max_svc, 10
+.equ max_svc, 11
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arm Cortex-M interrupt stack frame order:
@@ -71,14 +72,15 @@ svc_handler_end:
 
 .align 4
 svc_addr_table:
-    .word sys_exit            // 0
-    .word sys_sleep           // 1
-    .word sys_alloc           // 2
-    .word sys_dealloc         // 3
-    .word sys_block           // 4
-    .word sys_task_spawn      // 5
-    .word sys_yield           // 6
-    .word sys_ipc_publish     // 7
-    .word sys_ipc_subscribe   // 8
-    .word sys_ipc_get_message // 9
+    .word sys_exit               // 0
+    .word sys_sleep              // 1
+    .word sys_alloc              // 2
+    .word sys_dealloc            // 3
+    .word sys_block              // 4
+    .word sys_task_spawn         // 5
+    .word sys_yield              // 6
+    .word sys_ipc_publish        // 7
+    .word sys_ipc_subscribe      // 8
+    .word sys_ipc_get_message    // 9
     .word sys_get_heap_remaining // 10
+    .word sys_interrupt_register // 11
