@@ -407,6 +407,11 @@ fn kernel(_: &mut u32) {
                 }
                 None => (),
             }
+
+            //Clear any remaining leftover dynamically allocated data
+            unsafe {
+                crate::fe_alloc::clear_deleted_task(removed_task.pid);
+            }
         }
 
         //Going through the loop multiple times without anything else running is
