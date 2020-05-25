@@ -1,7 +1,10 @@
 [package]
 name = "fe_rtos"
 version = "0.1.0"
-authors = ["Bijan Tabatabai <bijan311@yahoo.com>"]
+authors = [
+    "Bijan Tabatabai <bijan311@gmail.com>",
+    "Dakota Kitzman <dakota.kitzman@gmail.com>"
+]
 edition = "2018"
 
 [dependencies]
