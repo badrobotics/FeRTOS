@@ -3,6 +3,8 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
+use alloc::sync::Arc;
 use cortex_m::peripheral::scb::Exception;
 use fe_osi::allocator::get_heap_remaining;
 
@@ -17,7 +19,8 @@ fn hello_task(_: &mut usize) {
     let mut stdout = fe_osi::ipc::Publisher::new("stdout").unwrap();
     let mut counter = 0;
     loop {
-        let msg = alloc::format!("Hello, World! {} {:X}\r\n", counter, get_heap_remaining()).into_bytes();
+        let msg =
+            alloc::format!("Hello, World! {} {:X}\r\n", counter, get_heap_remaining()).into_bytes();
         stdout.publish(msg).unwrap();
         counter += 1;
     }
@@ -34,6 +37,21 @@ fn writer_task(_: &mut usize) {
     }
 }
 
+fn test_task(_: &mut usize) {
+    let _test: Arc<[u32]> = Arc::new([0; 200]);
+    let _test2: Box<[u32]> = Box::new([0; 200]);
+    fe_osi::sleep(1000);
+    fe_osi::exit();
+    loop {}
+}
+
+fn spawn_task(_: &mut usize) {
+    loop {
+        fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, test_task, None);
+        fe_osi::sleep(2000);
+    }
+}
+
 #[no_mangle]
 fn main() -> ! {
     let mut p = cortex_m::peripheral::Peripherals::take().unwrap();
@@ -44,6 +62,7 @@ fn main() -> ! {
 
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);
+    fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, spawn_task, None);
 
     //It's probably a good idea to have the context switch be the lowest
     //priority interrupt.
