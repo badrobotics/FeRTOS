@@ -1,6 +1,17 @@
 use core::panic::PanicInfo;
 use core::ptr;
 
+/// Registers an interrupt to a specific handler.
+/// This should only be used for bootstrapping purposes to setup the system.
+/// Once FeRTOS is up and running `fe_osi::interrupt::register_interrupt` should
+/// be used.
+///
+/// # Examples
+/// ```
+/// fe_rtos::interrupt::int_register(Exception::SysTick.irqn(), fe_rtos::task::sys_tick as *const usize);
+/// fe_rtos::interrupt::int_register(Exception::PendSV.irqn(), fe_rtos::task::context_switch as *const usize);
+/// fe_rtos::interrupt::int_register(Exception::SVCall.irqn(), fe_rtos::syscall::svc_handler as *const usize);
+/// ```
 #[cfg(target_arch = "arm")]
 pub fn int_register(irqn: i8, int_handler: *const usize) {
     //This is defined in the linker script
@@ -36,9 +47,12 @@ pub fn int_register(irqn: i8, int_handler: *const usize) {
     }
 }
 
-// The reset handler
+/// The reset handler. This is the very first thing that runs when the system starts.
+///
+/// # Safety
+/// This function should never be directly called.
 #[no_mangle]
-pub unsafe extern "C" fn Reset() -> ! {
+unsafe extern "C" fn Reset() -> ! {
     //Initialize the static variables in RAM
     extern "C" {
         static mut _sbss: u8;

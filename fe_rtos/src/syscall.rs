@@ -12,6 +12,7 @@ use fe_osi::ipc::Message;
 use fe_osi::semaphore::Semaphore;
 
 extern "C" {
+    /// The system call handler. This should never be called directly.
     pub fn svc_handler();
 }
 

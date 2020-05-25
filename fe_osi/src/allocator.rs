@@ -1,5 +1,8 @@
 use core::alloc::{GlobalAlloc, Layout};
 
+/// The allocator that should be used for standalone FeRTOS binaries.
+/// Because FeRTOS does not currently support standalone binaries, this is
+/// currently useless.
 pub struct FeAllocator;
 
 #[repr(C)]
@@ -14,6 +17,10 @@ extern "C" {
     fn do_get_heap_remaining() -> usize;
 }
 
+/// Returns the total amount of free memory in the heap.
+/// Note: This is simply a debugging tool. Because it does not consider
+/// fragmentation inside the heap, it cannot indicate whether or not an allocation
+/// will succeed.
 pub fn get_heap_remaining() -> usize {
     unsafe { do_get_heap_remaining() }
 }
