@@ -55,7 +55,8 @@ pub const DEFAULT_STACK_SIZE: usize = 1024;
 
 static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
-static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
+static PUSHING_TASK_SCHED: AtomicBool = AtomicBool::new(false);
+static PUSHING_TASK_NEW: AtomicBool = AtomicBool::new(false);
 static mut PLACEHOLDER_TASK: Task = Task {
     sp: StackPtr { num: 0 },
     dynamic_stack: Vec::new(),
@@ -104,7 +105,7 @@ unsafe fn scheduler() {
     };
 
     //If a task is being currently being pushed by the kernel, run it so it can finish
-    if PUSHING_TASK.load(Ordering::SeqCst) {
+    if PUSHING_TASK_SCHED.load(Ordering::SeqCst) {
         NEXT_TASK = Some(Arc::clone(&default_task));
         return;
     }
@@ -232,7 +233,9 @@ pub(crate) unsafe fn add_task(
 
     let task_ref = Arc::new(new_task);
 
+    PUSHING_TASK_NEW.store(true, Ordering::SeqCst);
     NEW_TASK_QUEUE.push(Arc::clone(&task_ref));
+    PUSHING_TASK_NEW.store(false, Ordering::SeqCst);
 
     task_ref
 }
@@ -265,7 +268,9 @@ pub(crate) unsafe fn add_task_static(
 
     let task_ref = Arc::new(new_task);
 
+    PUSHING_TASK_NEW.store(true, Ordering::SeqCst);
     NEW_TASK_QUEUE.push(Arc::clone(&task_ref));
+    PUSHING_TASK_NEW.store(false, Ordering::SeqCst);
 
     task_ref
 }
@@ -329,7 +334,7 @@ fn kernel(_: &mut u32) {
         let mut delete_task = false;
 
         //Add all new tasks to the task list
-        while !NEW_TASK_QUEUE.is_empty() {
+        while !NEW_TASK_QUEUE.is_empty() && !PUSHING_TASK_NEW.load(Ordering::SeqCst) {
             match NEW_TASK_QUEUE.pop() {
                 Ok(new_task) => {
                     task_list.push_back(new_task);
@@ -350,9 +355,9 @@ fn kernel(_: &mut u32) {
             match task_state {
                 TaskState::Runnable => {
                     if !task.queued.compare_and_swap(false, true, Ordering::SeqCst) {
-                        PUSHING_TASK.store(true, Ordering::SeqCst);
+                        PUSHING_TASK_SCHED.store(true, Ordering::SeqCst);
                         SCHEDULER_QUEUE.push(Arc::clone(&task));
-                        PUSHING_TASK.store(false, Ordering::SeqCst);
+                        PUSHING_TASK_SCHED.store(false, Ordering::SeqCst);
                     } else if SCHEDULER_QUEUE.is_empty() {
                         task.queued.store(false, Ordering::SeqCst);
                     }
@@ -406,6 +411,11 @@ fn kernel(_: &mut u32) {
                     }
                 }
                 None => (),
+            }
+
+            //Clear any remaining leftover dynamically allocated data
+            unsafe {
+                crate::fe_alloc::clear_deleted_task(removed_task.pid);
             }
         }
 
