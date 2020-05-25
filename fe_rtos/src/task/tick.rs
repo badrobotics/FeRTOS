@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 
-pub struct TickCounter {
+pub(crate) struct TickCounter {
     lsb: AtomicU32,
     msb: AtomicU32,
 }

@@ -51,6 +51,7 @@ pub(crate) struct NewTaskInfo {
 }
 
 const INIT_XPSR: usize = 0x01000000;
+/// The default and recommended stack size for a task.
 pub const DEFAULT_STACK_SIZE: usize = 1024;
 
 static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
@@ -76,6 +77,7 @@ lazy_static! {
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
 extern "C" {
+    /// Context switch interrupt handler. This should never be called directly.
     pub fn context_switch();
 }
 
@@ -148,6 +150,11 @@ pub(crate) unsafe fn do_context_switch() {
     TRIGGER_CONTEXT_SWITCH();
 }
 
+/// The systick interrupt handler.
+///
+/// # Safety
+/// This function should not be called directly, and should only be called by
+/// the system tick interrupt.
 pub unsafe extern "C" fn sys_tick() {
     TICKS.inc();
     do_context_switch();
@@ -299,6 +306,11 @@ pub(crate) unsafe fn remove_task() -> bool {
     ret_val
 }
 
+/// Starts the FeRTOS scheduler to begin executing tasks.
+///
+/// trigger_context_switch is a pointer to a function that forces a context switch
+/// enable_systic is a closure that enables the systick interrupt
+/// reload_val is the number of counts on the systick counter in a tick
 pub fn start_scheduler<F: FnOnce(usize)>(
     trigger_context_switch: fn(),
     enable_systick: F,

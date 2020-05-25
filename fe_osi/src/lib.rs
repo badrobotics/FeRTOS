@@ -3,10 +3,10 @@
 #![feature(vec_into_raw_parts)]
 
 pub mod allocator;
+pub mod interrupt;
 pub mod ipc;
 pub mod semaphore;
 pub mod task;
-pub mod interrupt;
 
 extern "C" {
     fn do_exit() -> usize;
@@ -14,6 +14,7 @@ extern "C" {
     fn do_yield() -> usize;
 }
 
+/// Causes the calling task to exit.
 pub fn exit() -> usize {
     unsafe {
         do_exit();
@@ -22,6 +23,8 @@ pub fn exit() -> usize {
     loop {}
 }
 
+/// Causes the calling task to block for at least the specified number of
+/// milliseconds.
 pub fn sleep(ms: u32) -> usize {
     unsafe {
         do_sleep(ms);
@@ -29,6 +32,8 @@ pub fn sleep(ms: u32) -> usize {
 
     0
 }
+
+/// Triggers a context switch.
 pub fn r#yield() -> usize {
     unsafe {
         do_yield();

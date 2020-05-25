@@ -34,11 +34,19 @@ impl Into<Vec<u8>> for Message {
     }
 }
 
+/// A data structure that allows tasks to publish messages to an IPC topic
 pub struct Publisher {
     pub topic: CString,
 }
 
 impl Publisher {
+    /// Creates a new Publisher for the specified topic
+    ///
+    /// #Examples
+    ///
+    /// ```
+    /// let my_publisher = Publisher::new("my topic").unwrap();
+    /// ```
     pub fn new(topic: &str) -> Result<Self, &'static str> {
         let c_topic = match CString::new(topic) {
             Ok(t) => t,
@@ -47,6 +55,12 @@ impl Publisher {
         Ok(Publisher { topic: c_topic })
     }
 
+    /// Publishes a message to the topic.
+    ///
+    /// #Examples
+    /// ```
+    /// my_publisher.publish("Hello, World!".into_bytes());
+    /// ```
     pub fn publish(&mut self, mut message: Vec<u8>) -> Result<(), &'static str> {
         message.shrink_to_fit();
         let (msg_ptr, msg_len, _msg_cap) = message.into_raw_parts();
@@ -60,11 +74,17 @@ impl Publisher {
     }
 }
 
+/// A data structure that allows tasks to subscribe to a topic
 pub struct Subscriber {
     pub topic: CString,
 }
 
 impl Subscriber {
+    /// Creates a new Subscriber for the specified topic
+    ///
+    /// ```
+    /// let my_subscriber = Subscriber::new("my topic").unwrap();
+    /// ```
     pub fn new(topic: &str) -> Result<Self, &'static str> {
         let c_topic = match CString::new(topic) {
             Ok(t) => t,
@@ -88,10 +108,14 @@ impl Subscriber {
         }
     }
 
+    /// Returns the next message from the topic.
+    /// Blocks if there are no new messages.
     pub fn get_message(&mut self) -> Option<Vec<u8>> {
         self.get_message_base(true)
     }
 
+    /// Returns the next message from the topic if there is one.
+    /// If there are no new messages, it returns None
     pub fn get_message_nonblocking(&mut self) -> Option<Vec<u8>> {
         self.get_message_base(false)
     }

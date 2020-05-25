@@ -3,14 +3,14 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use fe_osi::semaphore::Semaphore;
 
 #[derive(Clone, Copy)]
-pub enum TaskState {
+pub(crate) enum TaskState {
     Runnable,
     Asleep(u64),
     Blocking(*const Semaphore),
     Zombie,
 }
 
-pub struct TaskStateStruct {
+pub(crate) struct TaskStateStruct {
     state: RefCell<TaskState>,
     in_use: AtomicBool,
 }

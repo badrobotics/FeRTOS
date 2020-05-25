@@ -40,6 +40,8 @@ struct AllocData {
 
 static mut ALLOC_LIST: Vec<AllocData> = Vec::new();
 
+/// The global allocator for FeRTOS.
+/// KernelAllocator is enabled automatically by the crate
 pub struct KernelAllocator;
 
 unsafe impl GlobalAlloc for KernelAllocator {
