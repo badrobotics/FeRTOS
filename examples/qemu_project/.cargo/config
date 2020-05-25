@@ -1,5 +1,5 @@
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
-runner = "qemu-system-arm -M lm3s6965evb -cpu cortex-m3 -serial stdio -kernel target/thumbv7m-none-eabi/debug/qemu_project"
+runner = "qemu-system-arm -M lm3s6965evb -cpu cortex-m3 -serial stdio -kernel ../../target/thumbv7m-none-eabi/debug/qemu_project"
 
 rustflags = [
     "-C", "link-arg=-Tlink.x",

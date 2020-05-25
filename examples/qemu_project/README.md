@@ -7,9 +7,9 @@ qemu-system-arm -M lm3s6965evb \
     -serial stdio \
     -gdb tcp::3333 \
     -S \
-    -kernel target/thumbv7m-none-eabi/debug/qemu_project
+    -kernel ../../target/thumbv7m-none-eabi/debug/qemu_project
 ```
 Then in another terminal run:
 ```
-gdb-multiarch -x qemu.gdb -q -tui target/thumbv7m-none-eabi/debug/qemu_project
+gdb-multiarch -x qemu.gdb -q -tui ../../target/thumbv7m-none-eabi/debug/qemu_project
 ```
