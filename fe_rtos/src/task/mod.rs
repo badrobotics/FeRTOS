@@ -1,10 +1,13 @@
 extern crate alloc;
 extern crate crossbeam_queue;
 
+mod schedule;
 mod task_state;
 mod tick;
 
+use crate::spinlock::Spinlock;
 use crate::syscall;
+use crate::task::schedule::{RoundRobin, Scheduler};
 use crate::task::task_state::{TaskState, TaskStateStruct};
 use crate::task::tick::TickCounter;
 use alloc::boxed::Box;
@@ -38,7 +41,6 @@ pub(crate) struct Task {
     //This will be a raw pointer to a Box that will need to be freed
     task_info: Option<Box<NewTaskInfo>>,
     state: TaskStateStruct,
-    queued: AtomicBool,
     pub(crate) pid: usize,
 }
 
@@ -56,24 +58,22 @@ pub const DEFAULT_STACK_SIZE: usize = 1024;
 
 static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
-static PUSHING_TASK_SCHED: AtomicBool = AtomicBool::new(false);
-static PUSHING_TASK_NEW: AtomicBool = AtomicBool::new(false);
 static mut PLACEHOLDER_TASK: Task = Task {
     sp: StackPtr { num: 0 },
     dynamic_stack: Vec::new(),
     task_info: None,
     state: TaskStateStruct::new(),
-    queued: AtomicBool::new(false),
     pid: 0,
 };
+static mut SCHEDULER: RoundRobin = RoundRobin::new();
 static mut KERNEL_TASK: Option<Arc<Task>> = None;
 static mut NEXT_TASK: Option<Arc<Task>> = None;
 static mut CUR_TASK: &mut Task = unsafe { &mut PLACEHOLDER_TASK };
 lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
-    static ref SCHEDULER_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
 }
 
+static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
 extern "C" {
@@ -106,12 +106,7 @@ unsafe fn scheduler() {
         None => panic!("No valid KERNEL_TASK in scheduler"),
     };
 
-    //If a task is being currently being pushed by the kernel, run it so it can finish
-    if PUSHING_TASK_SCHED.load(Ordering::SeqCst) {
-        NEXT_TASK = Some(Arc::clone(&default_task));
-        return;
-    }
-
+    //Make sure we don't accidentally drop a task
     let count = match &NEXT_TASK {
         Some(task) => Arc::strong_count(&task),
         None => 0xFF,
@@ -121,33 +116,24 @@ unsafe fn scheduler() {
     }
 
     //Find the next task to run if there is one
-    match SCHEDULER_QUEUE.pop() {
-        Ok(task) => {
-            //We want to default to Runnable because if a task is in a transition state,
-            //it should be scheduled so it can finish transitioning.
-            let task_state = task.state.try_get().unwrap_or(TaskState::Runnable);
-
-            task.queued.store(false, Ordering::SeqCst);
-            match task_state {
-                TaskState::Runnable => {
-                    NEXT_TASK = Some(Arc::clone(&task));
-                }
-                _ => {
-                    NEXT_TASK = Some(Arc::clone(&default_task));
-                }
-            }
+    match SCHEDULER.next() {
+        Some(task) => {
+            NEXT_TASK = Some(task);
         }
-        Err(_) => {
+        None => {
             NEXT_TASK = Some(Arc::clone(&default_task));
         }
     }
 }
 
 pub(crate) unsafe fn do_context_switch() {
-    super::disable_interrupts();
-    scheduler();
-    super::enable_interrupts();
-    TRIGGER_CONTEXT_SWITCH();
+    static CS_LOCK: Spinlock = Spinlock::new();
+
+    if CS_LOCK.try_take() {
+        scheduler();
+        CS_LOCK.give();
+        TRIGGER_CONTEXT_SWITCH();
+    }
 }
 
 /// The systick interrupt handler.
@@ -227,7 +213,6 @@ pub(crate) unsafe fn add_task(
         dynamic_stack: vec![0; stack_size],
         task_info: None,
         state: TaskStateStruct::new(),
-        queued: AtomicBool::new(false),
         pid: get_new_pid(),
     };
 
@@ -240,9 +225,9 @@ pub(crate) unsafe fn add_task(
 
     let task_ref = Arc::new(new_task);
 
-    PUSHING_TASK_NEW.store(true, Ordering::SeqCst);
+    PUSHING_TASK.store(true, Ordering::SeqCst);
     NEW_TASK_QUEUE.push(Arc::clone(&task_ref));
-    PUSHING_TASK_NEW.store(false, Ordering::SeqCst);
+    PUSHING_TASK.store(false, Ordering::SeqCst);
 
     task_ref
 }
@@ -260,7 +245,6 @@ pub(crate) unsafe fn add_task_static(
         dynamic_stack: Vec::new(),
         task_info: None,
         state: TaskStateStruct::new(),
-        queued: AtomicBool::new(false),
         pid: get_new_pid(),
     };
 
@@ -275,9 +259,9 @@ pub(crate) unsafe fn add_task_static(
 
     let task_ref = Arc::new(new_task);
 
-    PUSHING_TASK_NEW.store(true, Ordering::SeqCst);
+    PUSHING_TASK.store(true, Ordering::SeqCst);
     NEW_TASK_QUEUE.push(Arc::clone(&task_ref));
-    PUSHING_TASK_NEW.store(false, Ordering::SeqCst);
+    PUSHING_TASK.store(false, Ordering::SeqCst);
 
     task_ref
 }
@@ -326,9 +310,7 @@ pub fn start_scheduler<F: FnOnce(usize)>(
             None,
         );
         //Add something to the scheduler queue so something can run right away
-        kernel_task_ref.queued.store(true, Ordering::SeqCst);
         KERNEL_TASK = Some(Arc::clone(&kernel_task_ref));
-        SCHEDULER_QUEUE.push(kernel_task_ref);
         TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
@@ -338,6 +320,7 @@ pub fn start_scheduler<F: FnOnce(usize)>(
 }
 
 fn kernel(_: &mut u32) {
+    let mut first_push = true;
     let mut task_list: LinkedList<Arc<Task>> = LinkedList::new();
 
     loop {
@@ -345,15 +328,30 @@ fn kernel(_: &mut u32) {
         let mut deleted_task_num: usize = 0;
         let mut delete_task = false;
 
+        //Make sure the kernel gets added to the scheduler when it starts
+        if first_push {
+            unsafe {
+                super::disable_interrupts();
+            }
+        }
         //Add all new tasks to the task list
-        while !NEW_TASK_QUEUE.is_empty() && !PUSHING_TASK_NEW.load(Ordering::SeqCst) {
+        while !NEW_TASK_QUEUE.is_empty() && !PUSHING_TASK.load(Ordering::SeqCst) {
             match NEW_TASK_QUEUE.pop() {
                 Ok(new_task) => {
-                    task_list.push_back(new_task);
+                    task_list.push_back(Arc::clone(&new_task));
+                    unsafe {
+                        SCHEDULER.add_task(new_task);
+                    }
                 }
                 Err(_) => {
                     break;
                 }
+            }
+        }
+        if first_push {
+            first_push = false;
+            unsafe {
+                super::enable_interrupts();
             }
         }
 
@@ -365,15 +363,7 @@ fn kernel(_: &mut u32) {
             let task_state = task.state.try_get().unwrap_or(TaskState::Runnable);
 
             match task_state {
-                TaskState::Runnable => {
-                    if !task.queued.compare_and_swap(false, true, Ordering::SeqCst) {
-                        PUSHING_TASK_SCHED.store(true, Ordering::SeqCst);
-                        SCHEDULER_QUEUE.push(Arc::clone(&task));
-                        PUSHING_TASK_SCHED.store(false, Ordering::SeqCst);
-                    } else if SCHEDULER_QUEUE.is_empty() {
-                        task.queued.store(false, Ordering::SeqCst);
-                    }
-                }
+                TaskState::Runnable => {}
                 TaskState::Asleep(wake_up_ticks) => {
                     unsafe {
                         //If this task is asleep, see if we should wake it up

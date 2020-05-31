@@ -38,6 +38,14 @@ impl TaskStateStruct {
         if !self.in_use.compare_and_swap(false, true, Ordering::SeqCst) {
             self.state.replace(new_state);
             self.in_use.store(false, Ordering::SeqCst);
+            //If the task state changes from being runnable, yield to make
+            //sure the task doesn't run when it shouldn't
+            match new_state {
+                TaskState::Runnable => (),
+                _ => {
+                    fe_osi::r#yield();
+                }
+            }
 
             true
         } else {
