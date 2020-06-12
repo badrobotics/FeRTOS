@@ -10,6 +10,7 @@ extern crate fe_osi;
 mod fe_alloc;
 pub mod interrupt;
 pub mod ipc;
+mod spinlock;
 pub mod syscall;
 pub mod task;
 

@@ -13,3 +13,14 @@ Then in another terminal run:
 ```
 gdb-multiarch -x qemu.gdb -q -tui ../../target/thumbv7m-none-eabi/debug/qemu_project
 ```
+<br/>
+Or more simply, in one terminal run:
+```
+./start_debug.sh
+```
+To build the project and start qemu with the arguments above.<br/>
+Then in another terminal run:
+```
+./start_gdb.sh
+```
+To start gdb with the arguments above
