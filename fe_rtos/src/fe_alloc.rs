@@ -1,12 +1,12 @@
 extern crate alloc;
 
+use crate::spinlock::Spinlock;
 use crate::task::get_cur_task;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 use core::mem::size_of;
 use core::ptr::null_mut;
-use core::sync::atomic::{AtomicBool, Ordering};
 use fe_osi::allocator::LayoutFFI;
 
 /******************************************************************************
@@ -28,7 +28,7 @@ const SIZE_MASK: usize = !HEADER_ALIGN;
 const ALLOC_MASK: usize = 0x4;
 const FIRST_MASK: usize = 0x2;
 const LAST_MASK: usize = 0x1;
-static CLEARING_TASK: AtomicBool = AtomicBool::new(false);
+static ALLOC_LOCK: Spinlock = Spinlock::new();
 static mut HEAP: *mut u8 = null_mut();
 static mut HEAP_SIZE: usize = 0;
 static mut HEAP_REMAINING: usize = 0;
@@ -91,7 +91,7 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
         intermediate
     };
 
-    super::disable_interrupts();
+    ALLOC_LOCK.take();
 
     //Loop through the heap to find an unallocated block with enough room
     while header_ptr < heap_max {
@@ -113,7 +113,8 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
         });
         ADDING_TO_LIST = false;
     }
-    super::enable_interrupts();
+
+    ALLOC_LOCK.give();
 
     data_ptr
 }
@@ -133,8 +134,7 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     let is_first = (header_data & FIRST_MASK) == FIRST_MASK;
     let is_last = (header_data & LAST_MASK) == LAST_MASK;
 
-    super::disable_interrupts();
-
+    ALLOC_LOCK.take();
     // We don't ever want to deallocate ALLOC_LIST
     if ptr != ALLOC_LIST.as_mut_ptr() as *mut u8 {
         //Remove the entry corresponding to ptr from the ALLOC_LIST
@@ -203,9 +203,7 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
 
     HEAP_REMAINING += old_size;
 
-    if !CLEARING_TASK.load(Ordering::Relaxed) {
-        super::enable_interrupts();
-    }
+    ALLOC_LOCK.give();
 }
 
 unsafe fn init_heap() {
@@ -218,7 +216,7 @@ unsafe fn init_heap() {
     HEAP_SIZE = (&mut _eheap as *mut u8 as usize) - (HEAP as usize);
     HEAP_REMAINING = HEAP_SIZE;
 
-    super::disable_interrupts();
+    ALLOC_LOCK.take();
 
     //Basically just set the initial memory block header and footer
     let heap_ptr = HEAP as usize;
@@ -228,7 +226,7 @@ unsafe fn init_heap() {
     *header = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
     *footer = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
 
-    super::enable_interrupts();
+    ALLOC_LOCK.give();
 }
 
 unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut u8 {
@@ -267,12 +265,11 @@ unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut
 }
 
 pub(crate) unsafe fn clear_deleted_task(pid: usize) {
-    super::disable_interrupts();
     //CLEARING_TASK is needed because dropping a box will
     //enable interrupts
-    CLEARING_TASK.store(true, Ordering::SeqCst);
     let mut i = 0;
 
+    ALLOC_LOCK.take();
     while i < ALLOC_LIST.len() {
         if ALLOC_LIST[i].pid == pid {
             Box::from_raw(ALLOC_LIST[i].ptr);
@@ -280,9 +277,7 @@ pub(crate) unsafe fn clear_deleted_task(pid: usize) {
             i += 1;
         }
     }
-
-    CLEARING_TASK.store(false, Ordering::SeqCst);
-    super::enable_interrupts();
+    ALLOC_LOCK.give();
 }
 
 pub fn get_heap_remaining() -> usize {
