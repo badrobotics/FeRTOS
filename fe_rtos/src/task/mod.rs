@@ -65,6 +65,7 @@ static mut PLACEHOLDER_TASK: Task = Task {
     state: TaskStateStruct::new(),
     pid: 0,
 };
+static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
 static mut SCHEDULER: RoundRobin = RoundRobin::new();
 static mut KERNEL_TASK: Option<Arc<Task>> = None;
 static mut NEXT_TASK: Option<Arc<Task>> = None;
@@ -73,7 +74,6 @@ lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
 }
 
-static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
 static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
 
 extern "C" {
