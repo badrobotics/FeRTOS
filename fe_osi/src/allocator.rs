@@ -1,3 +1,4 @@
+use crate::{print_msg, putc};
 use core::alloc::{GlobalAlloc, Layout};
 
 /// The allocator that should be used for standalone FeRTOS binaries.
@@ -43,7 +44,42 @@ unsafe impl GlobalAlloc for FeAllocator {
     }
 }
 
+fn usize_to_chars(char_slice: &mut [u8], num: usize) -> usize {
+    let mut i = char_slice.len() - 1;
+    let mut val = num;
+
+    loop {
+        //This is some ascii shenanigans
+        char_slice[i] = ((val % 10) + 0x30) as u8;
+        val /= 10;
+
+        if val == 0 || i == 0 {
+            break;
+        }
+
+        i -= 1;
+    }
+
+    //This is the index where the caller should start printing from
+    i
+}
+
 #[alloc_error_handler]
-fn error_handler(_layout: Layout) -> ! {
+fn error_handler(layout: Layout) -> ! {
+    //You should only need 20 digits to represent a 64-bit number
+    let mut digits: [u8; 20] = [0; 20];
+
+    // We don't use panic! here because the panic handler does heap allocation
+    print_msg("Out of memory!\n");
+    print_msg("Size: ");
+    let start_idx = usize_to_chars(&mut digits, layout.size());
+    print_msg(core::str::from_utf8(&digits[start_idx..]).unwrap());
+    print_msg(" Alignment: ");
+    let start_idx = usize_to_chars(&mut digits, layout.align());
+    print_msg(core::str::from_utf8(&digits[start_idx..]).unwrap());
+    putc('\n');
+
+    crate::exit();
+
     loop {}
 }
