@@ -1,5 +1,10 @@
+extern crate alloc;
+
+use crate::task::get_cur_task;
+use alloc::format;
 use core::panic::PanicInfo;
 use core::ptr;
+use fe_osi::print_msg;
 
 /// Registers an interrupt to a specific handler.
 /// This should only be used for bootstrapping purposes to setup the system.
@@ -81,7 +86,31 @@ unsafe extern "C" fn Reset() -> ! {
 pub static RESET_VECTOR: unsafe extern "C" fn() -> ! = Reset;
 
 #[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
+fn panic(panic_info: &PanicInfo<'_>) -> ! {
+    let pid = unsafe { get_cur_task().pid };
+
+    unsafe {
+        super::disable_interrupts();
+    }
+
+    //Output which process has panicked
+    print_msg(format!("Oh no! Process {} has panicked!\n", pid).as_str());
+
+    //Output the file and line number if there is one
+    if let Some(loc) = panic_info.location() {
+        print_msg(format!("{} line {}\n", loc.file(), loc.line()).as_str());
+    }
+
+    //Output the panic message if we can be reasonably sure the heap can handle it
+    if let Some(msg) = panic_info.message() {
+        print_msg(format!("{}\n", msg).as_str());
+    }
+    unsafe {
+        super::enable_interrupts();
+    }
+
+    fe_osi::exit();
+
     loop {}
 }
 

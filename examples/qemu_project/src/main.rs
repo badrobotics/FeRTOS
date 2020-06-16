@@ -80,6 +80,10 @@ fn main() -> ! {
             .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
     }
 
+    fe_osi::set_putc(|c: char| {
+        write_byte(c as u8);
+    });
+
     //Start the FeRTOS scheduler
     let enable_systick = |reload: usize| {
         p.SYST.set_reload(reload as u32);
