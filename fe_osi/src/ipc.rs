@@ -90,12 +90,12 @@ impl Subscriber {
             Ok(t) => t,
             Err(_) => return Err("Invalid topic string"),
         };
-
-        let resp = unsafe { ipc_subscribe((&c_topic).as_ptr()) };
+        let new_sub = Subscriber { topic: c_topic };
+        let resp = unsafe { ipc_subscribe((&new_sub.topic).as_ptr()) };
         if resp == 1 {
             Err("Failed to subscribe to topic.")
         } else {
-            Ok(Subscriber { topic: c_topic })
+            Ok(new_sub)
         }
     }
 

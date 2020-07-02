@@ -9,9 +9,10 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
+use alloc::string::String;
 
-pub(crate) struct TopicRegistry<'a> {
-    pub(crate) topic_lookup: BTreeMap<&'a str, Topic>,
+pub(crate) struct TopicRegistry {
+    pub(crate) topic_lookup: BTreeMap<String, Topic>,
 }
 
 pub(crate) static mut TOPIC_REGISTERY_LOCK: Semaphore = Semaphore::new_mutex();
@@ -19,20 +20,21 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
     topic_lookup: BTreeMap::new(),
 };
 
-impl<'a> TopicRegistry<'a> {
-    pub(crate) fn publish_to_topic(&mut self, message_topic: &'a str, message: &[u8]) {
+impl TopicRegistry {
+    pub(crate) fn publish_to_topic(&mut self, message_topic: &str, message: &[u8]) {
+        let owned_topic = String::from(message_topic);
         self.topic_lookup
-            .entry(message_topic)
+            .entry(owned_topic)
             .and_modify(|topic| topic.add_message(message));
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &'a str) {
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) {
         let sem: Semaphore = Semaphore::new(0);
         let pid: usize = unsafe { get_cur_task().pid };
         let subscriber = Subscriber::new(sem, None);
-
+        let owned_topic = String::from(subscriber_topic);
         self.topic_lookup
-            .entry(subscriber_topic)
+            .entry(owned_topic)
             .or_insert_with(Topic::new)
             .add_subscriber(pid, subscriber);
     }
