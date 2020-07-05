@@ -23,14 +23,6 @@ pub fn link_syscalls() {}
 #[no_mangle]
 extern "C" fn sys_exit() -> usize {
     unsafe {
-        //let pid = task::get_cur_task().pid;
-        //ipc::TOPIC_REGISTERY_LOCK.take();
-        //for (name, topic) in &mut ipc::TOPIC_REGISTERY.topic_lookup {
-        //    print_msg(format!("Topic is: {}\r\n", name).as_str());
-        //    topic.subscribers.remove(&pid);
-        //}
-        //ipc::TOPIC_REGISTERY_LOCK.give();
-
         while !task::remove_task() {
             sys_yield();
         }
@@ -146,6 +138,28 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
             ipc::TOPIC_REGISTERY.subscribe_to_topic(topic);
         });
         0
+    }
+}
+
+#[no_mangle]
+extern "C" fn sys_ipc_unsubscribe(c_topic: *const c_char) -> usize {
+    unsafe {
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
+            Err(_) => {
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        let mut success = 1;
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            success = match ipc::TOPIC_REGISTERY.unsubscribe_from_topic(topic) {
+                Some(_) => 0,
+                None => 1, 
+            }
+        });
+        success
     }
 }
 

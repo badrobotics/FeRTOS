@@ -9,6 +9,7 @@
     .global do_yield
     .global ipc_publish
     .global ipc_subscribe
+    .global ipc_unsubscribe
     .global ipc_get_message
     .global do_get_heap_remaining
     .global do_register_interrupt
@@ -66,21 +67,27 @@ ipc_subscribe:
     PUSH { LR }
     svc 0x8
     POP { PC }
-
+    
     .thumb_func
-ipc_get_message:
+ipc_unsubscribe:
     PUSH { LR }
     svc 0x9
     POP { PC }
 
     .thumb_func
-do_get_heap_remaining:
+ipc_get_message:
     PUSH { LR }
     svc 0xa
     POP { PC }
 
     .thumb_func
-do_register_interrupt:
+do_get_heap_remaining:
     PUSH { LR }
     svc 0xb
+    POP { PC }
+
+    .thumb_func
+do_register_interrupt:
+    PUSH { LR }
+    svc 0xc
     POP { PC }

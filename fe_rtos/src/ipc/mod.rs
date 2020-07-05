@@ -39,6 +39,13 @@ impl TopicRegistry {
             .add_subscriber(pid, subscriber);
     }
 
+    pub(crate) fn unsubscribe_from_topic(&mut self, subscriber_topic: &str) -> Option<Subscriber> {
+        let pid: usize = unsafe { get_cur_task().pid };
+        self.topic_lookup
+            .get_mut(subscriber_topic)
+            .and_then(|topic| topic.remove_subscriber(pid))
+    }
+
     pub(crate) fn get_ipc_message(&mut self, msg_topic: &str) -> Option<Vec<u8>> {
         let cur_pid: usize = unsafe { get_cur_task().pid };
 

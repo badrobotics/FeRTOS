@@ -23,24 +23,32 @@ fn hello_task(_: &mut usize) {
             alloc::format!("Hello, World! {} {:X}\r\n", counter, get_heap_remaining()).into_bytes();
         stdout.publish(msg).unwrap();
         counter += 1;
+        fe_osi::sleep(10);
     }
 }
 
 fn writer_task(_: &mut usize) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
-        let msg = subscriber.get_message().unwrap();
-
-        for c in msg {
-            write_byte(c);
+        match subscriber.get_message_nonblocking() {
+            Some(msg) => {
+                for c in msg {
+                    write_byte(c);
+                }
+            },
+            None => {},
         }
+
     }
 }
 
 fn test_task(_: &mut usize) {
     let _test: Arc<[u32]> = Arc::new([0; 200]);
     let _test2: Box<[u32]> = Box::new([0; 200]);
-    fe_osi::sleep(1000);
+    {
+        let _subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
+        fe_osi::sleep(1000);
+    }
     fe_osi::exit();
     loop {}
 }

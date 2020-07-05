@@ -6,6 +6,7 @@ use cstr_core::{c_char, CString};
 extern "C" {
     fn ipc_publish(topic: *const c_char, msg_ptr: *mut u8, msg_len: usize) -> usize;
     fn ipc_subscribe(topic: *const c_char) -> usize;
+    fn ipc_unsubscribe(topic: *const c_char) -> usize;
     fn ipc_get_message(topic: *const c_char, block: bool) -> Message;
 }
 
@@ -118,5 +119,11 @@ impl Subscriber {
     /// If there are no new messages, it returns None
     pub fn get_message_nonblocking(&mut self) -> Option<Vec<u8>> {
         self.get_message_base(false)
+    }
+
+}
+impl Drop for Subscriber {
+    fn drop(&mut self) {
+        unsafe { ipc_unsubscribe((&self.topic).as_ptr()); }
     }
 }
