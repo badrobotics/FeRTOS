@@ -15,10 +15,10 @@ pub(crate) struct Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn new(sem: Semaphore, first_message: Option<Arc<MessageNode>>) -> Subscriber {
+    pub(crate) fn new() -> Subscriber {
         Subscriber {
-            lock: sem,
-            next_message: first_message,
+            lock: Semaphore::new(0),
+            next_message: None,
         }
     }
 }

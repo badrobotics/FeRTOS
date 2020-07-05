@@ -29,9 +29,8 @@ impl TopicRegistry {
     }
 
     pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) {
-        let sem: Semaphore = Semaphore::new(0);
         let pid: usize = unsafe { get_cur_task().pid };
-        let subscriber = Subscriber::new(sem, None);
+        let subscriber = Subscriber::new();
         let owned_topic = String::from(subscriber_topic);
         self.topic_lookup
             .entry(owned_topic)
