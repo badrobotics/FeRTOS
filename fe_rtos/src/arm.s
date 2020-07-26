@@ -17,7 +17,7 @@ context_switch:
     //Load the variables
     //The return value is in R0
     BL get_next_task
-    MOV R1, R0
+    MOV R4, R0
     BL get_cur_task
 
     //Switch stack pointers
@@ -25,10 +25,10 @@ context_switch:
     STR SP, [R0]
 
     //Load the new stack pointer
-    LDR SP, [R1]
+    LDR SP, [R4]
 
     //Set CUR_TASK = NEXT_TASK
-    MOV R0, R1
+    MOV R0, R4
     BL set_cur_task
 
     //Clear the CPU pipeline
