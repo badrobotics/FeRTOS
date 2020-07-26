@@ -69,7 +69,7 @@ static PUSHING_TASK: AtomicBool = AtomicBool::new(false);
 static mut SCHEDULER: RoundRobin = RoundRobin::new();
 static mut KERNEL_TASK: Option<Arc<Task>> = None;
 static mut NEXT_TASK: Option<Arc<Task>> = None;
-static mut CUR_TASK: &mut Task = unsafe { &mut PLACEHOLDER_TASK };
+static mut CUR_TASK: Option<&mut Task> = None;
 lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
 }
@@ -81,14 +81,24 @@ extern "C" {
     pub fn context_switch();
 }
 
+unsafe fn get_cur_task_mut() -> &'static mut Task {
+    match &mut CUR_TASK {
+        Some(task) => task,
+        None => &mut PLACEHOLDER_TASK,
+    }
+}
+
 #[no_mangle]
 pub(crate) unsafe extern "C" fn get_cur_task() -> &'static Task {
-    CUR_TASK
+    match &CUR_TASK {
+        Some(task) => task,
+        None => &PLACEHOLDER_TASK,
+    }
 }
 
 #[no_mangle]
 pub(crate) unsafe extern "C" fn set_cur_task(new_val: &'static mut Task) {
-    CUR_TASK = new_val;
+    CUR_TASK = Some(new_val);
 }
 
 #[no_mangle]
@@ -150,7 +160,7 @@ pub unsafe extern "C" fn sys_tick() {
 //of ticks
 pub(crate) fn sleep(sleep_ticks: u64) -> bool {
     unsafe {
-        let ret_val = CUR_TASK
+        let ret_val = get_cur_task()
             .state
             .try_set(TaskState::Asleep(TICKS.get() + sleep_ticks));
         //Trigger a context switch and wait until that happens
@@ -164,7 +174,7 @@ pub(crate) fn sleep(sleep_ticks: u64) -> bool {
 //is available
 pub(crate) fn block(sem: *const Semaphore) -> bool {
     unsafe {
-        let ret_val = CUR_TASK.state.try_set(TaskState::Blocking(sem));
+        let ret_val = get_cur_task().state.try_set(TaskState::Blocking(sem));
         do_context_switch();
 
         ret_val
@@ -272,7 +282,7 @@ pub(crate) unsafe fn add_task_static(
 pub(crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
     let task_param: &u32 = unsafe { &*task_info.param };
     let task_ep: fn(&u32) = unsafe { core::mem::transmute(task_info.ep) };
-    let task = unsafe { &mut CUR_TASK };
+    let task = unsafe { get_cur_task_mut() };
 
     task.task_info = Some(task_info);
 
@@ -284,7 +294,7 @@ pub(crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
 }
 
 pub(crate) unsafe fn remove_task() -> bool {
-    let ret_val = CUR_TASK.state.try_set(TaskState::Zombie);
+    let ret_val = get_cur_task().state.try_set(TaskState::Zombie);
     do_context_switch();
 
     ret_val
