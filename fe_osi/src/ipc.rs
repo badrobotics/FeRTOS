@@ -120,10 +120,11 @@ impl Subscriber {
     pub fn get_message_nonblocking(&mut self) -> Option<Vec<u8>> {
         self.get_message_base(false)
     }
-
 }
 impl Drop for Subscriber {
     fn drop(&mut self) {
-        unsafe { ipc_unsubscribe((&self.topic).as_ptr()); }
+        unsafe {
+            ipc_unsubscribe((&self.topic).as_ptr());
+        }
     }
 }

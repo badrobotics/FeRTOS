@@ -6,10 +6,10 @@ use crate::ipc::subscriber::{MessageNode, Subscriber};
 use crate::ipc::topic::Topic;
 use crate::task::get_cur_task;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
-use alloc::string::String;
 
 pub(crate) struct TopicRegistry {
     pub(crate) topic_lookup: BTreeMap<String, Topic>,

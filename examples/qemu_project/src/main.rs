@@ -36,10 +36,9 @@ fn writer_task(_: &mut usize) {
                 for c in msg {
                     write_byte(c);
                 }
-            },
-            None => {},
+            }
+            None => {}
         }
-
     }
 }
 

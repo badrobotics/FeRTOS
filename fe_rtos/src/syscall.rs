@@ -156,7 +156,7 @@ extern "C" fn sys_ipc_unsubscribe(c_topic: *const c_char) -> usize {
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
             success = match ipc::TOPIC_REGISTERY.unsubscribe_from_topic(topic) {
                 Some(_) => 0,
-                None => 1, 
+                None => 1,
             }
         });
         success
