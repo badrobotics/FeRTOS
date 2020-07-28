@@ -31,13 +31,10 @@ fn hello_task(_: &mut usize) {
 fn writer_task(_: &mut usize) {
     let mut subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
     loop {
-        match subscriber.get_message_nonblocking() {
-            Some(msg) => {
-                for c in msg {
-                    write_byte(c);
-                }
+        if let Some(msg) = subscriber.get_message_nonblocking() {
+            for c in msg {
+                write_byte(c);
             }
-            None => {}
         }
     }
 }
