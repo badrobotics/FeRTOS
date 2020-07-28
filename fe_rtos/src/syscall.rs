@@ -184,6 +184,10 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Messag
             sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
         });
 
+        if sem_ref.is_none() {
+            return get_null_message();
+        }
+
         if block {
             sem_ref.unwrap().take();
         } else if !sem_ref.unwrap().try_take() {
