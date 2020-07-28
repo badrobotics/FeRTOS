@@ -6,6 +6,7 @@ use crate::ipc;
 use crate::task;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use alloc::string::String;
 use cstr_core::{c_char, CStr};
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::ipc::Message;
@@ -23,6 +24,13 @@ pub fn link_syscalls() {}
 #[no_mangle]
 extern "C" fn sys_exit() -> usize {
     unsafe {
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            let topics: Vec<String> = ipc::TOPIC_REGISTERY.topic_lookup.keys().cloned().collect();
+            for topic in topics {
+                if let Some(_) = ipc::TOPIC_REGISTERY.unsubscribe_from_topic(&topic) {}
+            }
+        });
+
         while !task::remove_task() {
             sys_yield();
         }

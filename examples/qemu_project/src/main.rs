@@ -45,10 +45,8 @@ fn writer_task(_: &mut usize) {
 fn test_task(_: &mut usize) {
     let _test: Arc<[u32]> = Arc::new([0; 200]);
     let _test2: Box<[u32]> = Box::new([0; 200]);
-    {
-        let _subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
-        fe_osi::sleep(1000);
-    }
+    let _subscriber = fe_osi::ipc::Subscriber::new("stdout").unwrap();
+    fe_osi::sleep(1000);
     fe_osi::exit();
     loop {}
 }
