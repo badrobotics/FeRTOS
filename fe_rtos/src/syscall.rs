@@ -156,7 +156,7 @@ extern "C" fn sys_ipc_unsubscribe(c_topic: *const c_char) -> usize {
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
             success = match ipc::TOPIC_REGISTERY.unsubscribe_from_topic(topic) {
                 Some(_) => 0,
-                None => 1, 
+                None => 1,
             }
         });
         success
@@ -183,6 +183,10 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Messag
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
             sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
         });
+
+        if sem_ref.is_none() {
+            return get_null_message();
+        }
 
         if block {
             sem_ref.unwrap().take();

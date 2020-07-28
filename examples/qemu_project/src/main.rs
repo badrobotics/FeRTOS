@@ -23,7 +23,8 @@ fn hello_task(_: &mut usize) {
             alloc::format!("Hello, World! {} {:X}\r\n", counter, get_heap_remaining()).into_bytes();
         stdout.publish(msg).unwrap();
         counter += 1;
-        fe_osi::sleep(10);
+        // Give the subscribers enough time to clear the entries
+        fe_osi::sleep(50);
     }
 }
 
@@ -35,10 +36,9 @@ fn writer_task(_: &mut usize) {
                 for c in msg {
                     write_byte(c);
                 }
-            },
-            None => {},
+            }
+            None => {}
         }
-
     }
 }
 
