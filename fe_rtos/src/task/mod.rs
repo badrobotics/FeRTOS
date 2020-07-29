@@ -54,7 +54,7 @@ pub(crate) struct NewTaskInfo {
 
 const INIT_XPSR: usize = 0x01000000;
 /// The default and recommended stack size for a task.
-pub const DEFAULT_STACK_SIZE: usize = 1024;
+pub const DEFAULT_STACK_SIZE: usize = 1536;
 
 static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();

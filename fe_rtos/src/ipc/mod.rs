@@ -6,12 +6,13 @@ use crate::ipc::subscriber::{MessageNode, Subscriber};
 use crate::ipc::topic::Topic;
 use crate::task::get_cur_task;
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use fe_osi::semaphore::Semaphore;
 
-pub(crate) struct TopicRegistry<'a> {
-    pub(crate) topic_lookup: BTreeMap<&'a str, Topic>,
+pub(crate) struct TopicRegistry {
+    pub(crate) topic_lookup: BTreeMap<String, Topic>,
 }
 
 pub(crate) static mut TOPIC_REGISTERY_LOCK: Semaphore = Semaphore::new_mutex();
@@ -19,22 +20,29 @@ pub(crate) static mut TOPIC_REGISTERY: TopicRegistry = TopicRegistry {
     topic_lookup: BTreeMap::new(),
 };
 
-impl<'a> TopicRegistry<'a> {
-    pub(crate) fn publish_to_topic(&mut self, message_topic: &'a str, message: &[u8]) {
+impl TopicRegistry {
+    pub(crate) fn publish_to_topic(&mut self, message_topic: &str, message: &[u8]) {
+        let owned_topic = String::from(message_topic);
         self.topic_lookup
-            .entry(message_topic)
+            .entry(owned_topic)
             .and_modify(|topic| topic.add_message(message));
     }
 
-    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &'a str) {
-        let sem: Semaphore = Semaphore::new(0);
+    pub(crate) fn subscribe_to_topic(&mut self, subscriber_topic: &str) {
         let pid: usize = unsafe { get_cur_task().pid };
-        let subscriber = Subscriber::new(sem, None);
-
+        let subscriber = Subscriber::new();
+        let owned_topic = String::from(subscriber_topic);
         self.topic_lookup
-            .entry(subscriber_topic)
+            .entry(owned_topic)
             .or_insert_with(Topic::new)
             .add_subscriber(pid, subscriber);
+    }
+
+    pub(crate) fn unsubscribe_from_topic(&mut self, subscriber_topic: &str) -> Option<Subscriber> {
+        let pid: usize = unsafe { get_cur_task().pid };
+        self.topic_lookup
+            .get_mut(subscriber_topic)
+            .and_then(|topic| topic.remove_subscriber(pid))
     }
 
     pub(crate) fn get_ipc_message(&mut self, msg_topic: &str) -> Option<Vec<u8>> {

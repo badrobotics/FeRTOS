@@ -5,6 +5,7 @@ use crate::interrupt;
 use crate::ipc;
 use crate::task;
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec::Vec;
 use cstr_core::{c_char, CStr};
 use fe_osi::allocator::LayoutFFI;
@@ -23,6 +24,13 @@ pub fn link_syscalls() {}
 #[no_mangle]
 extern "C" fn sys_exit() -> usize {
     unsafe {
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            let topics: Vec<String> = ipc::TOPIC_REGISTERY.topic_lookup.keys().cloned().collect();
+            for topic in topics {
+                ipc::TOPIC_REGISTERY.unsubscribe_from_topic(&topic);
+            }
+        });
+
         while !task::remove_task() {
             sys_yield();
         }
@@ -141,6 +149,28 @@ extern "C" fn sys_ipc_subscribe(c_topic: *const c_char) -> usize {
     }
 }
 
+#[no_mangle]
+extern "C" fn sys_ipc_unsubscribe(c_topic: *const c_char) -> usize {
+    unsafe {
+        let topic: &str = match CStr::from_ptr(c_topic).to_str() {
+            Ok(topic) => topic,
+            Err(_) => {
+                // return early indicating failure
+                return 1;
+            }
+        };
+
+        let mut success = 1;
+        ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
+            success = match ipc::TOPIC_REGISTERY.unsubscribe_from_topic(topic) {
+                Some(_) => 0,
+                None => 1,
+            }
+        });
+        success
+    }
+}
+
 fn get_null_message() -> Message {
     Message {
         msg_ptr: core::ptr::null_mut(),
@@ -161,6 +191,10 @@ extern "C" fn sys_ipc_get_message(c_topic: *const c_char, block: bool) -> Messag
         ipc::TOPIC_REGISTERY_LOCK.with_lock(|| {
             sem_ref = ipc::TOPIC_REGISTERY.get_subscriber_lock(topic);
         });
+
+        if sem_ref.is_none() {
+            return get_null_message();
+        }
 
         if block {
             sem_ref.unwrap().take();

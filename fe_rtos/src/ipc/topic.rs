@@ -47,4 +47,8 @@ impl Topic {
         subscriber.next_message = None;
         self.subscribers.insert(pid, subscriber);
     }
+
+    pub(crate) fn remove_subscriber(&mut self, pid: usize) -> Option<Subscriber> {
+        self.subscribers.remove(&pid)
+    }
 }

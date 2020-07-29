@@ -9,6 +9,7 @@
     .weak sys_yield
     .weak sys_ipc_publish
     .weak sys_ipc_subscribe
+    .weak sys_ipc_unsubscribe
     .weak sys_ipc_get_message
     .weak sys_get_heap_remaining
     .weak sys_interrupt_register
@@ -81,6 +82,7 @@ svc_addr_table:
     .word sys_yield              // 6
     .word sys_ipc_publish        // 7
     .word sys_ipc_subscribe      // 8
-    .word sys_ipc_get_message    // 9
-    .word sys_get_heap_remaining // 10
-    .word sys_interrupt_register // 11
+    .word sys_ipc_unsubscribe    // 9
+    .word sys_ipc_get_message    // 10
+    .word sys_get_heap_remaining // 11
+    .word sys_interrupt_register // 12
