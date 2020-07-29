@@ -6,9 +6,16 @@ authors = [
     "Dakota Kitzman <dakota.kitzman@gmail.com>"
 ]
 edition = "2018"
+description = "A simple OS for Arm Cortex-M CPUs"
+readme = "../README.md"
+repository = "https://github.com/badrobotics/FeRTOS"
+keywords = ["cotrex-m", "rtos"]
+categories = ["embedded", "no-std", "science::robotics"]
+build = "build.rs"
+license = "LGPL-3.0"
 
 [dependencies]
-fe_osi = { path = "../fe_osi" }
+fe_osi = { path = "../fe_osi", version = "0.1" }
 
 [dependencies.crossbeam-queue]
 version = "0.2"
