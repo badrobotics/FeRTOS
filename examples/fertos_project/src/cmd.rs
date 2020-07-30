@@ -9,11 +9,17 @@ pub fn shell(_: &mut u8) {
 
     let prompt = String::from("\r\n>> ");
     let mut cmd_buffer: Vec<u8> = Vec::new();
-    stdout.publish(prompt.clone().into_bytes());
+    match stdout.publish(prompt.clone().into_bytes()) {
+        Ok(_) => (),
+        Err(_) => panic!("Error publishing"),
+    }
 
     loop {
         let mut msg = stdin.get_message().unwrap();
-        stdout.publish(msg.clone());
+        match stdout.publish(msg.clone()) {
+            Ok(_) => (),
+            Err(_) => panic!("Error publishing"),
+        }
         cmd_buffer.append(&mut msg);
         match cmd_buffer.iter().position(|&x| x == '\r' as u8) {
             Some(index) => {
@@ -22,7 +28,10 @@ pub fn shell(_: &mut u8) {
                     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_world, None);
                 }
 
-                stdout.publish(prompt.clone().into_bytes());
+                match stdout.publish(prompt.clone().into_bytes()) {
+                    Ok(_) => (),
+                    Err(_) => panic!("Error publishing"),
+                }
             }
             None => {}
         }

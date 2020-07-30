@@ -6,6 +6,13 @@ authors = [
     "Dakota Kitzman <dakota.kitzman@gmail.com>"
 ]
 edition = "2018"
+description = "OSI to help with writing code for fe_rtos"
+readme = "../README.md"
+repository = "https://github.com/badrobotics/FeRTOS"
+keywords = ["cortex-m", "rtos"]
+categories = ["embedded", "no-std", "science::robotics"]
+build = "build.rs"
+license = "LGPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
