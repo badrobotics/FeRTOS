@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if arch == "arm" {
         Build::new().file("./src/arm.s").compile("asm");
     } else {
-        panic!("Invalid architecture: {}", arch);
+        println!("Invalid architecture: {}", arch);
     }
 
     Ok(())

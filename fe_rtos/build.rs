@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .file("./src/arm_syscall.s")
             .compile("syscall_asm");
     } else {
-        panic!("Invalid architecture: {}", arch);
+        println!("Invalid architecture: {}", arch);
     }
 
     Ok(())

@@ -52,6 +52,9 @@ pub fn int_register(irqn: i8, int_handler: *const usize) {
     }
 }
 
+#[cfg(not(target_arch = "arm"))]
+pub fn int_register(_irqn: i8, _int_handler: *const usize) {}
+
 /// The reset handler. This is the very first thing that runs when the system starts.
 ///
 /// # Safety
