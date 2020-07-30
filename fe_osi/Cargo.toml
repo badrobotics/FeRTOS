@@ -1,6 +1,6 @@
 [package]
 name = "fe_osi"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     "Bijan Tabatabai <bijan311@gmail.com>",
     "Dakota Kitzman <dakota.kitzman@gmail.com>"

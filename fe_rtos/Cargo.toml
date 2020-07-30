@@ -1,6 +1,6 @@
 [package]
 name = "fe_rtos"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     "Bijan Tabatabai <bijan311@gmail.com>",
     "Dakota Kitzman <dakota.kitzman@gmail.com>"
@@ -15,7 +15,7 @@ build = "build.rs"
 license = "LGPL-3.0"
 
 [dependencies]
-fe_osi = { path = "../fe_osi", version = "0.1" }
+fe_osi = { path = "../fe_osi", version = "0.1.1" }
 
 [dependencies.crossbeam-queue]
 version = "0.2"
