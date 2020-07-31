@@ -32,6 +32,8 @@ union StackPtr {
 pub(crate) struct Task {
     //Stack pointer
     sp: StackPtr,
+    //Reference to the stack canary
+    canary: &'static usize,
     //Entry point into task
     //Holds the smart pointer to a dynamically allocated stack is applicable
     //It needs to be a smart type to easily allow for deallocation of the stack
@@ -53,6 +55,7 @@ pub(crate) struct NewTaskInfo {
 }
 
 const INIT_XPSR: usize = 0x01000000;
+const STACK_CANARY: usize = 0xC0DE5AFE;
 /// The default and recommended stack size for a task.
 pub const DEFAULT_STACK_SIZE: usize = 1536;
 
@@ -60,6 +63,7 @@ static mut KERNEL_STACK: [usize; DEFAULT_STACK_SIZE] = [0; DEFAULT_STACK_SIZE];
 static mut TICKS: TickCounter = TickCounter::new();
 static mut PLACEHOLDER_TASK: Task = Task {
     sp: StackPtr { num: 0 },
+    canary: &STACK_CANARY,
     dynamic_stack: Vec::new(),
     task_info: None,
     state: TaskStateStruct::new(),
@@ -181,13 +185,24 @@ pub(crate) fn block(sem: *const Semaphore) -> bool {
     }
 }
 
+//This function is necesarry right, but will make it easier to refactor when we add different archs
+unsafe fn set_canary(stack_bottom: *const usize, _stack_size: usize) -> *const usize {
+    //In arm, the canary will be the bottom of the stack
+    let canary = stack_bottom as *mut usize;
+    *canary = STACK_CANARY;
+    canary
+}
+
 //See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
 unsafe fn set_initial_stack(
-    stack_ptr: *const usize,
+    stack_bottom: *const usize,
+    stack_size: usize,
     entry_point: *const usize,
     param: *mut usize,
 ) -> *const usize {
-    let mut cur_ptr = ((stack_ptr as usize) - size_of::<usize>()) as *mut usize;
+    //Arm uses a full descending stack, so we have to start from the top
+    let stack_top = (stack_bottom as usize) + stack_size;
+    let mut cur_ptr = (stack_top - size_of::<usize>()) as *mut usize;
 
     //Set the xPSR
     *cur_ptr = INIT_XPSR;
@@ -218,20 +233,23 @@ pub(crate) unsafe fn add_task(
     entry_point: *const usize,
     param: *mut usize,
 ) -> Arc<Task> {
-    let mut new_task = Task {
-        sp: StackPtr { num: 0 },
-        dynamic_stack: vec![0; stack_size],
+    let mut sp = StackPtr { num: 0 };
+    let stack = vec![0; stack_size];
+    //Convert the adress of the first element of the vector into a ptr for the stack
+    sp.ptr = &stack[0] as *const usize;
+    let stack_size_bytes = size_of::<usize>() * stack_size;
+
+    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param);
+
+    let new_task = Task {
+        sp,
+        canary,
+        dynamic_stack: stack,
         task_info: None,
         state: TaskStateStruct::new(),
         pid: get_new_pid(),
     };
-
-    //Convert the adress of the first element of the vector into a ptr for the stack
-    new_task.sp.ptr = &new_task.dynamic_stack[0] as *const usize;
-    //Arm uses a full descending stack so we have to start from the top
-    new_task.sp.num += size_of::<usize>() * (stack_size as usize);
-
-    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param);
 
     let task_ref = Arc::new(new_task);
 
@@ -248,24 +266,26 @@ pub(crate) unsafe fn add_task_static(
     entry_point: *const usize,
     param: Option<*mut usize>,
 ) -> Arc<Task> {
-    let mut new_task = Task {
-        sp: StackPtr {
-            reference: stack_ptr,
-        },
-        dynamic_stack: Vec::new(),
-        task_info: None,
-        state: TaskStateStruct::new(),
-        pid: get_new_pid(),
+    let mut sp = StackPtr {
+        reference: stack_ptr,
     };
-
-    //Arm uses a full descending stack so we have to start from the top
-    new_task.sp.num += size_of::<usize>() * (stack_size as usize);
+    let stack_size_bytes = size_of::<usize>() * stack_size;
     let param_ptr = match param {
         Some(p) => p as *mut usize,
         None => null_mut(),
     };
 
-    new_task.sp.ptr = set_initial_stack(new_task.sp.ptr, entry_point, param_ptr);
+    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param_ptr);
+
+    let new_task = Task {
+        sp,
+        canary,
+        dynamic_stack: Vec::new(),
+        task_info: None,
+        state: TaskStateStruct::new(),
+        pid: get_new_pid(),
+    };
 
     let task_ref = Arc::new(new_task);
 
@@ -368,6 +388,19 @@ fn kernel(_: &mut u32) {
         for task in task_list.iter() {
             let mut new_state = TaskState::Runnable;
             let mut has_new_state = false;
+
+            //Check for stack overflow
+            if *task.canary != STACK_CANARY {
+                //We can't panic because the task stacks are in the heap
+                //so if there's an overflow the heap is all screwed up
+                let mut digits: [u8; 20] = [0; 20];
+                let start_idx = fe_osi::usize_to_chars(&mut digits, task.pid);
+                fe_osi::print_msg("Stack overflow in task ");
+                fe_osi::print_msg(core::str::from_utf8(&digits[start_idx..]).unwrap());
+                fe_osi::print_msg("!\n");
+                fe_osi::exit();
+            }
+
             //We want to default to Runnable because if a task is in a transition state,
             //it should be scheduled so it can finish transitioning.
             let task_state = task.state.try_get().unwrap_or(TaskState::Runnable);
