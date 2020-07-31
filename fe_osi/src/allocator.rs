@@ -1,4 +1,4 @@
-use crate::{print_msg, putc};
+use crate::{print_msg, putc, usize_to_chars};
 use core::alloc::{GlobalAlloc, Layout};
 
 /// The allocator that should be used for standalone FeRTOS binaries.
@@ -42,26 +42,6 @@ unsafe impl GlobalAlloc for FeAllocator {
         };
         do_dealloc(ptr, layout_ffi);
     }
-}
-
-fn usize_to_chars(char_slice: &mut [u8], num: usize) -> usize {
-    let mut i = char_slice.len() - 1;
-    let mut val = num;
-
-    loop {
-        //This is some ascii shenanigans
-        char_slice[i] = ((val % 10) + 0x30) as u8;
-        val /= 10;
-
-        if val == 0 || i == 0 {
-            break;
-        }
-
-        i -= 1;
-    }
-
-    //This is the index where the caller should start printing from
-    i
 }
 
 #[alloc_error_handler]

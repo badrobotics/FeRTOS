@@ -68,3 +68,38 @@ pub fn r#yield() -> usize {
 
     0
 }
+
+/// Puts the ASCII representation of `num` into char_slice.
+///
+/// # Return
+///
+/// returns the index of char_slice where the ascii representation begins.
+///
+/// #Examples
+///
+/// ```
+/// //You need a max of 20 digits to represent a 64 bit number
+/// let mut digits: [u8; 20] = [0; 20];
+/// let num = 1234;
+/// let start_index = usize_to_chars(&mut digits, num);
+/// let string: str = core::str::from_utf8(&digits[start_index..]).unwrap();
+/// ```
+pub fn usize_to_chars(char_slice: &mut [u8], num: usize) -> usize {
+    let mut i = char_slice.len() - 1;
+    let mut val = num;
+
+    loop {
+        //This is some ascii shenanigans
+        char_slice[i] = ((val % 10) + 0x30) as u8;
+        val /= 10;
+
+        if val == 0 || i == 0 {
+            break;
+        }
+
+        i -= 1;
+    }
+
+    //This is the index where the caller should start printing from
+    i
+}
