@@ -5,36 +5,36 @@ use crate::task::get_cur_task;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
-use core::mem::size_of;
 use core::ptr::null_mut;
 use fe_osi::allocator::LayoutFFI;
 
 /******************************************************************************
-* The structure of a heap memory block is the following:
-*   block header: size_of(usize) bytes, 2*size_of(usize) byte aligned
-*   block data: The data requested by the process
-*   padding: padding required to make the next header block 2*size_of(usize) byte aligned
-*   block footer: identical to the header
+* The structure of a heap is the following:
+*    ---------------------------------------------
+*   | free list |         useable heap            |
+*    ---------------------------------------------
+*   The beginning of the heap is reserved for the free list.
+*   The ith bit of the free list is 0 if the ith block in the useable heap is
+*   unallocated and is 1 otherwise.
+*   The "useable heap" is the part of the heap that will be used to service
+*   dynamic memory allocations.
 *
-* The headers have the following structure:
-*   bits 32-3: The size of the data including padding and headers/footers
-*   bit 2: 1 if the block is allocated. 0 otherwise
-*   bit 1: 1 if the block is the first block. 0 otherwise
-*   bit 0: 1 if the block is the last block. 0 otherwise
+*   In the code below, the useable heap will simple be refered to as the "heap."
 ******************************************************************************/
 
-const HEADER_ALIGN: usize = (2 * size_of::<usize>()) - 1;
-const SIZE_MASK: usize = !HEADER_ALIGN;
-const ALLOC_MASK: usize = 0x4;
-const FIRST_MASK: usize = 0x2;
-const LAST_MASK: usize = 0x1;
+const BLOCK_SIZE: usize = 0x10;
+// Look up table for potential bit masks
+const BIT_LUT: [u8; 8] = [0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF];
 static ALLOC_LOCK: Spinlock = Spinlock::new();
+static mut FREE_LIST: *mut u8 = null_mut();
+static mut NUM_BLOCKS: usize = 0;
 static mut HEAP: *mut u8 = null_mut();
 static mut HEAP_SIZE: usize = 0;
 static mut HEAP_REMAINING: usize = 0;
 
 struct AllocData {
     ptr: *mut u8,
+    blocks: usize,
     pid: usize,
 }
 
@@ -72,43 +72,73 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
         init_heap();
     }
 
-    let mut header_ptr = HEAP as usize;
     let mut data_ptr = null_mut();
-    let heap_max = header_ptr + HEAP_SIZE;
-    //The address after the header is usize aligned, so if the  alignment
-    //required is greater than that, we need padding before the data pointer.
-    //We also need to consider that the header of the next block needs to
-    //be 2 * usize aligned.
-    let size_needed = {
-        //size =               header
-        let mut intermediate = size_of::<usize>();
-        //           + padding
-        intermediate = (intermediate + layout.align - 1) & !(layout.align - 1);
-        //           +  data size     + footer
-        intermediate += layout.size + size_of::<usize>();
-        //           + padding
-        intermediate = (intermediate + HEADER_ALIGN) & !HEADER_ALIGN;
-        intermediate
+    let mut cur_block = 0;
+    let blocks_needed = if layout.size % BLOCK_SIZE == 0 {
+        layout.size / BLOCK_SIZE
+    } else {
+        (layout.size / BLOCK_SIZE) + 1
     };
 
     ALLOC_LOCK.take();
 
-    //Loop through the heap to find an unallocated block with enough room
-    while header_ptr < heap_max {
-        let header_data = *(header_ptr as *const usize);
+    //Loop through the heap to find an unallocated group of blocks with enough room
+    while cur_block + blocks_needed < NUM_BLOCKS {
+        //Determine the location corresponding to this block
+        let ptr = HEAP.add(cur_block * BLOCK_SIZE);
 
-        if (header_data & ALLOC_MASK) == 0 && (header_data & SIZE_MASK) >= size_needed {
-            data_ptr = alloc_block(header_ptr, size_needed, layout);
-            break;
+        //If this block doesn't meet the alignment requirements, move on
+        if (ptr as usize) & (layout.align - 1) != 0 {
+            cur_block += 1;
+            continue;
         }
 
-        header_ptr += header_data & SIZE_MASK;
+        //See if there's enough room at this block
+        data_ptr = ptr;
+        for _ in 0..blocks_needed {
+            //Determine the byte and bit of this block
+            let idx = cur_block / 8;
+            let bit = cur_block % 8;
+            let bit_mask = 1 << bit;
+            cur_block += 1;
+
+            if *FREE_LIST.add(idx) & bit_mask == bit_mask {
+                data_ptr = null_mut();
+                break;
+            }
+        }
+
+        if !data_ptr.is_null() {
+            //Mark the data locations as allocated
+            let start_block = cur_block - blocks_needed;
+            cur_block = start_block;
+            while cur_block < start_block + blocks_needed {
+                let blocks_remaining = blocks_needed - (cur_block - start_block);
+                let idx = cur_block / 8;
+                let bit = cur_block % 8;
+                //If we need to allocate more blocks than are represented in
+                //this byte of the free list, set the rest of the bits,
+                //otherwise, just set the bits you need.
+                let bit_mask = if blocks_remaining >= 8 - bit {
+                    cur_block += 8 - bit;
+                    BIT_LUT[8 - bit - 1] << bit
+                } else {
+                    cur_block += blocks_remaining;
+                    BIT_LUT[blocks_remaining - 1] << bit
+                };
+
+                *FREE_LIST.add(idx) |= bit_mask;
+            }
+            HEAP_REMAINING -= blocks_needed * BLOCK_SIZE;
+            break;
+        }
     }
 
     if !data_ptr.is_null() && !ADDING_TO_LIST {
         ADDING_TO_LIST = true;
         ALLOC_LIST.push(AllocData {
             ptr: data_ptr,
+            blocks: blocks_needed,
             pid: get_cur_task().pid,
         });
         ADDING_TO_LIST = false;
@@ -120,23 +150,13 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
 }
 
 pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
-    //Recover the block header from the aligned data pointer
-    let header = if layout.align > size_of::<usize>() {
-        //If the alignment was big enough, a pointer to the
-        //header will be directly behind the data ptr
-        *(((ptr as usize) - size_of::<usize>()) as *mut usize)
-    } else {
-        //Otherwise, the header is directly behind the data pointer
-        (ptr as usize) - size_of::<usize>()
-    };
-    let header_data = *(header as *const usize);
-    let old_size = header_data & SIZE_MASK;
-    let is_first = (header_data & FIRST_MASK) == FIRST_MASK;
-    let is_last = (header_data & LAST_MASK) == LAST_MASK;
+    //Determine the block that the pointer belongs to
+    let start_block = (ptr as usize - HEAP as usize) / BLOCK_SIZE;
+    let mut cur_block = start_block;
 
     ALLOC_LOCK.take();
-    // We don't ever want to deallocate ALLOC_LIST
-    if ptr != ALLOC_LIST.as_mut_ptr() as *mut u8 {
+    // Allocations for the ALLOC_LIST won't be in the list
+    let num_blocks = if ptr != ALLOC_LIST.as_mut_ptr() as *mut u8 {
         //Remove the entry corresponding to ptr from the ALLOC_LIST
         let mut index: usize = usize::MAX;
         for (i, entry) in ALLOC_LIST.iter().enumerate() {
@@ -147,61 +167,35 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
         }
 
         if index != usize::MAX {
-            ALLOC_LIST.swap_remove(index);
+            ALLOC_LIST.swap_remove(index).blocks
+        } else {
+            return;
         }
+    } else if layout.size % BLOCK_SIZE == 0 {
+        layout.size / BLOCK_SIZE
+    } else {
+        (layout.size / BLOCK_SIZE) + 1
+    };
+
+    while cur_block < start_block + num_blocks {
+        let blocks_remaining = num_blocks - (cur_block - start_block);
+        let idx = cur_block / 8;
+        let bit = cur_block % 8;
+        //If we need to deallocate more blocks than are represented in
+        //this byte of the free list, set the rest of the bits,
+        //otherwise, just set the bits you need.
+        let bit_mask = if blocks_remaining >= 8 - bit {
+            cur_block += 8 - bit;
+            !(BIT_LUT[8 - bit - 1] << bit)
+        } else {
+            cur_block += blocks_remaining;
+            !(BIT_LUT[blocks_remaining - 1] << bit)
+        };
+
+        *FREE_LIST.add(idx) &= bit_mask;
     }
 
-    let next_header = header + old_size;
-    let next_hdr_data = if is_last {
-        //If the current block is the last one, we have no guarentees that
-        //reading from the "next" one is valid
-        0
-    } else {
-        *(next_header as *const usize)
-    };
-
-    let prev_footer = header - size_of::<usize>();
-    let prev_ftr_data = if is_first {
-        //If the current block is the first one, we have no guarentees that
-        //reading from the "previous" one is valid
-        0
-    } else {
-        *(prev_footer as *const usize)
-    };
-
-    //coalesce this block with adjacent free blocks if able
-    let left_coalesce = !is_first && (prev_ftr_data & ALLOC_MASK) == 0;
-    let right_coalesce = !is_last && (next_hdr_data & ALLOC_MASK) == 0;
-    let new_header = if left_coalesce {
-        header - (prev_ftr_data & SIZE_MASK)
-    } else {
-        header
-    };
-    let new_footer = if right_coalesce {
-        next_header + (next_hdr_data & SIZE_MASK) - size_of::<usize>()
-    } else {
-        next_header - size_of::<usize>()
-    };
-
-    let new_size = new_footer - new_header + size_of::<usize>();
-
-    //Have the header and footer reflect out changes
-    //By using the = operator, the ALLOC bit is implicitly set to 0
-    *(new_header as *mut usize) = new_size & SIZE_MASK;
-    if left_coalesce {
-        *(new_header as *mut usize) |= prev_ftr_data & FIRST_MASK;
-    } else {
-        *(new_header as *mut usize) |= header_data & FIRST_MASK;
-    }
-
-    if right_coalesce {
-        *(new_header as *mut usize) |= next_hdr_data & LAST_MASK;
-    } else {
-        *(new_header as *mut usize) |= header_data & LAST_MASK;
-    }
-    *(new_footer as *mut usize) = *(new_header as *mut usize);
-
-    HEAP_REMAINING += old_size;
+    HEAP_REMAINING += num_blocks * BLOCK_SIZE;
 
     ALLOC_LOCK.give();
 }
@@ -212,56 +206,38 @@ unsafe fn init_heap() {
         static mut _sheap: u8;
         static mut _eheap: u8;
     }
-    HEAP = &mut _sheap as *mut u8;
-    HEAP_SIZE = (&mut _eheap as *mut u8 as usize) - (HEAP as usize);
+    //Make sure FREE_LIST and total_heap_size are block aligned. It just makes things easier
+    FREE_LIST =
+        (((&mut _sheap as *mut u8 as usize) + (BLOCK_SIZE - 1)) & !(BLOCK_SIZE - 1)) as *mut u8;
+    let total_heap_size =
+        ((&mut _eheap as *mut u8 as usize) - (FREE_LIST as usize)) & !(BLOCK_SIZE - 1);
+    // Determining the size of the heap and the free list is a little tricky.
+    // First, for brevity, let's define some variables:
+    // x is the size of the free list, y is the size of the heap, z is the total
+    // heap size, and b is the block size.
+    // We know simply that z = x + y
+    // We also know that each bit of the free list represents a block in the
+    // heap, and there are 8 bits in a byte so:
+    // x = y / (8b)
+    // From substitution with the equation for z, we get
+    // z = (y / (8b)) + y
+    // Which we can simplify to
+    // y = z * (8b)/(8b + 1)
+    // We will also do some math to make sure that y % b == 0
+    // We are also assuming the entire heap and heap size is block size aligned
+    HEAP_SIZE = (total_heap_size * (8 * BLOCK_SIZE) / ((8 * BLOCK_SIZE) + 1)) & !(BLOCK_SIZE - 1);
+    NUM_BLOCKS = HEAP_SIZE / BLOCK_SIZE;
+    let free_list_size = total_heap_size - HEAP_SIZE;
+    HEAP = FREE_LIST.add(free_list_size);
+
     HEAP_REMAINING = HEAP_SIZE;
 
     ALLOC_LOCK.take();
 
-    //Basically just set the initial memory block header and footer
-    let heap_ptr = HEAP as usize;
-    let header = heap_ptr as *mut usize;
-    let footer = (heap_ptr + (HEAP_SIZE & SIZE_MASK) - size_of::<usize>()) as *mut usize;
-
-    *header = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
-    *footer = (HEAP_SIZE & SIZE_MASK) | FIRST_MASK | LAST_MASK;
+    // Set all of the blocks to free
+    core::ptr::write_bytes(FREE_LIST, 0, free_list_size);
 
     ALLOC_LOCK.give();
-}
-
-unsafe fn alloc_block(header_ptr: usize, size: usize, layout: LayoutFFI) -> *mut u8 {
-    let alloc_header = header_ptr as *mut usize;
-    let alloc_footer = (header_ptr + size - size_of::<usize>()) as *mut usize;
-    let old_size = *alloc_header & SIZE_MASK;
-    let unalloc_header = (header_ptr + size) as *mut usize;
-    let unalloc_footer = (header_ptr + old_size - size_of::<usize>()) as *mut usize;
-    let is_first = *alloc_header & FIRST_MASK;
-    let is_last = *alloc_header & LAST_MASK;
-
-    *alloc_header = size | ALLOC_MASK | is_first;
-    *alloc_footer = *alloc_header;
-
-    // If the block that we are allocating from is greater than
-    // The size that we need, make a new unallocated block with
-    // the excess
-    if old_size > size {
-        *unalloc_header = ((old_size - size) & SIZE_MASK) | is_last;
-        *unalloc_footer = *unalloc_header;
-    }
-
-    //compute the pointer
-    let data_ptr = (header_ptr + size_of::<usize>() + layout.align - 1) & !(layout.align - 1);
-
-    //If the alignment is greater than size_of<usize>(), put a pointer to the
-    //header behind the data pointer so we can find it during deallocation
-    if layout.align > size_of::<usize>() {
-        let ptr = (data_ptr - size_of::<usize>()) as *mut usize;
-        *ptr = alloc_header as usize;
-    }
-
-    HEAP_REMAINING -= size;
-
-    data_ptr as *mut u8
 }
 
 pub(crate) unsafe fn clear_deleted_task(pid: usize) {

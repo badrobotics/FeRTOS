@@ -66,8 +66,7 @@ SECTIONS
 
   _sidata = LOADADDR(.data);
 
-  /* Make sure the heap is 8 byte aligned */
-  .heap ALIGN(0x8):
+  .heap :
   {
     _sheap = .;
     /* Determines the heap size */
