@@ -11,15 +11,15 @@ use fe_osi::allocator::LayoutFFI;
 /******************************************************************************
 * The structure of a heap is the following:
 *    ---------------------------------------------
-*   | free list |         useable heap            |
+*   | free list |         usable heap            |
 *    ---------------------------------------------
 *   The beginning of the heap is reserved for the free list.
-*   The ith bit of the free list is 0 if the ith block in the useable heap is
+*   The ith bit of the free list is 0 if the ith block in the usable heap is
 *   unallocated and is 1 otherwise.
-*   The "useable heap" is the part of the heap that will be used to service
+*   The "usable heap" is the part of the heap that will be used to service
 *   dynamic memory allocations.
 *
-*   In the code below, the useable heap will simple be refered to as the "heap."
+*   In the code below, the usable heap will simple be refered to as the "heap."
 ******************************************************************************/
 
 const BLOCK_SIZE: usize = 0x10;
