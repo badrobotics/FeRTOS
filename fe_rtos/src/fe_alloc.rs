@@ -23,13 +23,10 @@ use fe_osi::allocator::LayoutFFI;
 ******************************************************************************/
 
 const BLOCK_SIZE: usize = 0x10;
-// Look up table for potential bit masks
-const BIT_LUT: [u8; 8] = [0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF];
 static ALLOC_LOCK: Spinlock = Spinlock::new();
 static mut FREE_LIST: *mut u8 = null_mut();
 static mut NUM_BLOCKS: usize = 0;
 static mut HEAP: *mut u8 = null_mut();
-static mut HEAP_SIZE: usize = 0;
 static mut HEAP_REMAINING: usize = 0;
 
 struct AllocData {
@@ -64,6 +61,22 @@ unsafe impl GlobalAlloc for KernelAllocator {
     }
 }
 
+fn get_bit_mask(bit: usize, blocks_remaining: usize, cur_block: &mut usize) -> u8 {
+    // Look up table for potential bit masks
+    const BIT_LUT: [u8; 8] = [0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF];
+
+    //If we need to include more bits than are represented in
+    //this byte of the free list, set the rest of the bits,
+    //otherwise, just set the bits you need.
+    if blocks_remaining >= 8 - bit {
+        *cur_block += 8 - bit;
+        BIT_LUT[8 - bit - 1] << bit
+    } else {
+        *cur_block += blocks_remaining;
+        BIT_LUT[blocks_remaining - 1] << bit
+    }
+}
+
 pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     static mut ADDING_TO_LIST: bool = false;
 
@@ -94,15 +107,15 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
         }
 
         //See if there's enough room at this block
+        let start_block = cur_block;
         data_ptr = ptr;
-        for _ in 0..blocks_needed {
-            //Determine the byte and bit of this block
+        while cur_block < start_block + blocks_needed {
+            let blocks_remaining = blocks_needed - (cur_block - start_block);
             let idx = cur_block / 8;
             let bit = cur_block % 8;
-            let bit_mask = 1 << bit;
-            cur_block += 1;
+            let bit_mask = get_bit_mask(bit, blocks_remaining, &mut cur_block);
 
-            if *FREE_LIST.add(idx) & bit_mask == bit_mask {
+            if *FREE_LIST.add(idx) & bit_mask != 0 {
                 data_ptr = null_mut();
                 break;
             }
@@ -110,22 +123,12 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
 
         if !data_ptr.is_null() {
             //Mark the data locations as allocated
-            let start_block = cur_block - blocks_needed;
             cur_block = start_block;
             while cur_block < start_block + blocks_needed {
                 let blocks_remaining = blocks_needed - (cur_block - start_block);
                 let idx = cur_block / 8;
                 let bit = cur_block % 8;
-                //If we need to allocate more blocks than are represented in
-                //this byte of the free list, set the rest of the bits,
-                //otherwise, just set the bits you need.
-                let bit_mask = if blocks_remaining >= 8 - bit {
-                    cur_block += 8 - bit;
-                    BIT_LUT[8 - bit - 1] << bit
-                } else {
-                    cur_block += blocks_remaining;
-                    BIT_LUT[blocks_remaining - 1] << bit
-                };
+                let bit_mask = get_bit_mask(bit, blocks_remaining, &mut cur_block);
 
                 *FREE_LIST.add(idx) |= bit_mask;
             }
@@ -155,22 +158,17 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     let mut cur_block = start_block;
 
     ALLOC_LOCK.take();
-    // Allocations for the ALLOC_LIST won't be in the list
-    let num_blocks = if ptr != ALLOC_LIST.as_mut_ptr() as *mut u8 {
-        //Remove the entry corresponding to ptr from the ALLOC_LIST
-        let mut index: usize = usize::MAX;
-        for (i, entry) in ALLOC_LIST.iter().enumerate() {
-            if entry.ptr == ptr {
-                index = i;
-                break;
-            }
+    //Remove the entry corresponding to ptr from the ALLOC_LIST
+    let mut index: usize = usize::MAX;
+    for (i, entry) in ALLOC_LIST.iter().enumerate() {
+        if entry.ptr == ptr {
+            index = i;
+            break;
         }
+    }
 
-        if index != usize::MAX {
-            ALLOC_LIST.swap_remove(index).blocks
-        } else {
-            return;
-        }
+    let num_blocks = if index != usize::MAX {
+        ALLOC_LIST.swap_remove(index).blocks
     } else if layout.size % BLOCK_SIZE == 0 {
         layout.size / BLOCK_SIZE
     } else {
@@ -181,16 +179,7 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
         let blocks_remaining = num_blocks - (cur_block - start_block);
         let idx = cur_block / 8;
         let bit = cur_block % 8;
-        //If we need to deallocate more blocks than are represented in
-        //this byte of the free list, set the rest of the bits,
-        //otherwise, just set the bits you need.
-        let bit_mask = if blocks_remaining >= 8 - bit {
-            cur_block += 8 - bit;
-            !(BIT_LUT[8 - bit - 1] << bit)
-        } else {
-            cur_block += blocks_remaining;
-            !(BIT_LUT[blocks_remaining - 1] << bit)
-        };
+        let bit_mask = !get_bit_mask(bit, blocks_remaining, &mut cur_block);
 
         *FREE_LIST.add(idx) &= bit_mask;
     }
@@ -225,12 +214,12 @@ unsafe fn init_heap() {
     // y = z * (8b)/(8b + 1)
     // We will also do some math to make sure that y % b == 0
     // We are also assuming the entire heap and heap size is block size aligned
-    HEAP_SIZE = (total_heap_size * (8 * BLOCK_SIZE) / ((8 * BLOCK_SIZE) + 1)) & !(BLOCK_SIZE - 1);
-    NUM_BLOCKS = HEAP_SIZE / BLOCK_SIZE;
-    let free_list_size = total_heap_size - HEAP_SIZE;
+    let usable_heap_size = (total_heap_size * (8 * BLOCK_SIZE) / ((8 * BLOCK_SIZE) + 1)) & !(BLOCK_SIZE - 1);
+    NUM_BLOCKS = usable_heap_size / BLOCK_SIZE;
+    let free_list_size = total_heap_size - usable_heap_size;
     HEAP = FREE_LIST.add(free_list_size);
 
-    HEAP_REMAINING = HEAP_SIZE;
+    HEAP_REMAINING = usable_heap_size;
 
     ALLOC_LOCK.take();
 
