@@ -217,7 +217,8 @@ unsafe fn init_heap() {
     // y = z * (8b)/(8b + 1)
     // We will also do some math to make sure that y % b == 0
     // We are also assuming the entire heap and heap size is block size aligned
-    let usable_heap_size = (total_heap_size * (8 * BLOCK_SIZE) / ((8 * BLOCK_SIZE) + 1)) & !(BLOCK_SIZE - 1);
+    let usable_heap_size =
+        (total_heap_size * (8 * BLOCK_SIZE) / ((8 * BLOCK_SIZE) + 1)) & !(BLOCK_SIZE - 1);
     NUM_BLOCKS = usable_heap_size / BLOCK_SIZE;
     let free_list_size = total_heap_size - usable_heap_size;
     HEAP = FREE_LIST.add(free_list_size);
