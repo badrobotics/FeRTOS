@@ -61,6 +61,9 @@ unsafe impl GlobalAlloc for KernelAllocator {
     }
 }
 
+// Returns the appropriate bit mask for a bit position with a certain number of
+// bits remaining to process. Also updates cur_block by the number of blocks/bits
+// included in the returned bit mask.
 fn get_bit_mask(bit: usize, blocks_remaining: usize, cur_block: &mut usize) -> u8 {
     // Look up table for potential bit masks
     const BIT_LUT: [u8; 8] = [0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF];
