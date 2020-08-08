@@ -83,10 +83,12 @@ fn get_bit_mask(bit: usize, blocks_remaining: usize, cur_block: &mut usize) -> u
 pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
     static mut ADDING_TO_LIST: bool = false;
 
-    //If HEAP points to, we need to initialize the heap
+    //If HEAP points to zero, we need to initialize the heap
+    ALLOC_LOCK.take();
     if (HEAP as usize) == 0 {
         init_heap();
     }
+    ALLOC_LOCK.give();
 
     let mut data_ptr = null_mut();
     let mut cur_block = 0;
@@ -225,12 +227,8 @@ unsafe fn init_heap() {
 
     HEAP_REMAINING = usable_heap_size;
 
-    ALLOC_LOCK.take();
-
     // Set all of the blocks to free
     core::ptr::write_bytes(FREE_LIST, 0, free_list_size);
-
-    ALLOC_LOCK.give();
 }
 
 pub(crate) unsafe fn clear_deleted_task(pid: usize) {
