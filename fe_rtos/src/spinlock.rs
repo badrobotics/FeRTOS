@@ -53,9 +53,7 @@ impl Spinlock {
 
         if self.count.load(Ordering::SeqCst) <= 1 {
             self.pid.store(0, Ordering::SeqCst);
-            self.count.store(0, Ordering::SeqCst);
-        } else {
-            self.count.fetch_sub(1, Ordering::SeqCst);
         }
+        self.count.fetch_sub(1, Ordering::SeqCst);
     }
 }
