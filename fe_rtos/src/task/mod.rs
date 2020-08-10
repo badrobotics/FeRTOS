@@ -5,6 +5,7 @@ mod schedule;
 mod task_state;
 mod tick;
 
+use crate::arch;
 use crate::spinlock::Spinlock;
 use crate::syscall;
 use crate::task::schedule::{RoundRobin, Scheduler};
@@ -54,8 +55,7 @@ pub(crate) struct NewTaskInfo {
     pub param: *mut u32,
 }
 
-const INIT_XPSR: usize = 0x01000000;
-const STACK_CANARY: usize = 0xC0DE5AFE;
+pub(crate) const STACK_CANARY: usize = 0xC0DE5AFE;
 /// The default and recommended stack size for a task.
 pub const DEFAULT_STACK_SIZE: usize = 1536;
 
@@ -185,44 +185,6 @@ pub(crate) fn block(sem: *const Semaphore) -> bool {
     }
 }
 
-//This function is necesarry right, but will make it easier to refactor when we add different archs
-unsafe fn set_canary(stack_bottom: *const usize, _stack_size: usize) -> *const usize {
-    //In arm, the canary will be the bottom of the stack
-    let canary = stack_bottom as *mut usize;
-    *canary = STACK_CANARY;
-    canary
-}
-
-//See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(
-    stack_bottom: *const usize,
-    stack_size: usize,
-    entry_point: *const usize,
-    param: *mut usize,
-) -> *const usize {
-    //Arm uses a full descending stack, so we have to start from the top
-    let stack_top = (stack_bottom as usize) + stack_size;
-    let mut cur_ptr = (stack_top - size_of::<usize>()) as *mut usize;
-
-    //Set the xPSR
-    *cur_ptr = INIT_XPSR;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    //Set the PC
-    *cur_ptr = entry_point as usize;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    //Set the LR
-    *cur_ptr = idle as usize;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    for _i in 0..13 {
-        *cur_ptr = param as usize;
-        cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-    }
-    (cur_ptr as usize + size_of::<usize>()) as *const usize
-}
-
 fn get_new_pid() -> usize {
     static PID: AtomicUsize = AtomicUsize::new(1);
     PID.fetch_add(1, Ordering::SeqCst)
@@ -239,8 +201,8 @@ pub(crate) unsafe fn add_task(
     sp.ptr = &stack[0] as *const usize;
     let stack_size_bytes = size_of::<usize>() * stack_size;
 
-    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
-    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param);
+    let canary: &'static usize = &*arch::set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = arch::set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param);
 
     let new_task = Task {
         sp,
@@ -275,8 +237,8 @@ pub(crate) unsafe fn add_task_static(
         None => null_mut(),
     };
 
-    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
-    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param_ptr);
+    let canary: &'static usize = &*arch::set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = arch::set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param_ptr);
 
     let new_task = Task {
         sp,
@@ -472,6 +434,6 @@ fn kernel(_: &mut u32) {
     }
 }
 
-fn idle() {
+pub(crate) fn idle() {
     loop {}
 }

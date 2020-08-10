@@ -8,6 +8,12 @@
 extern crate lazy_static;
 extern crate fe_osi;
 
+#[cfg(target_arch = "arm")]
+#[path = "arch/arm/mod.rs"]
+pub mod arch;
+#[cfg(not(target_arch = "arm"))]
+#[path = "arch/none/mod.rs"]
+pub mod arch;
 mod fe_alloc;
 pub mod interrupt;
 pub mod ipc;
