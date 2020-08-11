@@ -1,6 +1,31 @@
 use crate::task;
 use core::mem::size_of;
 use core::ptr;
+use cortex_m::peripheral::scb::Exception;
+
+extern "C" {
+    fn context_switch();
+    fn svc_handler();
+}
+
+/// Sets up everything the arm needs before starting FeRTOS.
+/// This should be called before doing anything FeRTOS related.
+pub fn arch_setup(p: &mut cortex_m::peripheral::Peripherals) {
+    int_register(Exception::SysTick.irqn(), task::sys_tick as *const usize);
+    int_register(Exception::PendSV.irqn(), context_switch as *const usize);
+    int_register(Exception::SVCall.irqn(), svc_handler as *const usize);
+
+    //It's probably a good idea to have the context switch be the lowest
+    //priority interrupt.
+    unsafe {
+        p.SCB
+            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
+    }
+}
+
+pub(crate) unsafe fn trigger_context_switch() {
+    cortex_m::peripheral::SCB::set_pendsv();
+}
 
 pub(crate) unsafe fn set_canary(stack_bottom: *const usize, _stack_size: usize) -> *const usize {
     //In arm, the canary will be the bottom of the stack

@@ -78,13 +78,6 @@ lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
 }
 
-static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
-
-extern "C" {
-    /// Context switch interrupt handler. This should never be called directly.
-    pub fn context_switch();
-}
-
 unsafe fn get_cur_task_mut() -> &'static mut Task {
     match &mut CUR_TASK {
         Some(task) => task,
@@ -146,16 +139,11 @@ pub(crate) unsafe fn do_context_switch() {
     if CS_LOCK.try_take() {
         scheduler();
         CS_LOCK.give();
-        TRIGGER_CONTEXT_SWITCH();
+        arch::trigger_context_switch();
     }
 }
 
-/// The systick interrupt handler.
-///
-/// # Safety
-/// This function should not be called directly, and should only be called by
-/// the system tick interrupt.
-pub unsafe extern "C" fn sys_tick() {
+pub(crate) unsafe extern "C" fn sys_tick() {
     TICKS.inc();
     do_context_switch();
 }
@@ -287,11 +275,7 @@ pub(crate) unsafe fn remove_task() -> bool {
 /// trigger_context_switch is a pointer to a function that forces a context switch
 /// enable_systic is a closure that enables the systick interrupt
 /// reload_val is the number of counts on the systick counter in a tick
-pub fn start_scheduler<F: FnOnce(usize)>(
-    trigger_context_switch: fn(),
-    enable_systick: F,
-    reload_val: usize,
-) {
+pub fn start_scheduler<F: FnOnce(usize)>(enable_systick: F, reload_val: usize) {
     syscall::link_syscalls();
 
     unsafe {
@@ -303,7 +287,6 @@ pub fn start_scheduler<F: FnOnce(usize)>(
         );
         //Add something to the scheduler queue so something can run right away
         KERNEL_TASK = Some(Arc::clone(&kernel_task_ref));
-        TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
     enable_systick(reload_val);

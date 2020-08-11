@@ -12,11 +12,6 @@ use fe_osi::allocator::LayoutFFI;
 use fe_osi::ipc::Message;
 use fe_osi::semaphore::Semaphore;
 
-extern "C" {
-    /// The system call handler. This should never be called directly.
-    pub fn svc_handler();
-}
-
 //For the linker to link the syscalls, a function in this
 //file must be called from elsewhere...
 pub fn link_syscalls() {}

@@ -9,7 +9,6 @@ mod uart_server;
 extern crate alloc;
 
 use alloc::boxed::Box;
-use cortex_m::peripheral::scb::Exception;
 use hal::prelude::*;
 #[cfg(feature = "tm4c123")]
 use tm4c123x_hal as hal;
@@ -63,18 +62,7 @@ fn main() -> ! {
         &sc.power_control,
     );
 
-    fe_rtos::arch::int_register(
-        Exception::SysTick.irqn(),
-        fe_rtos::task::sys_tick as *const usize,
-    );
-    fe_rtos::arch::int_register(
-        Exception::PendSV.irqn(),
-        fe_rtos::task::context_switch as *const usize,
-    );
-    fe_rtos::arch::int_register(
-        Exception::SVCall.irqn(),
-        fe_rtos::syscall::svc_handler as *const usize,
-    );
+    fe_rtos::arch::arch_setup(&mut cp);
 
     let (uart0_tx, uart0_rx) = uart0.split();
 
@@ -109,11 +97,7 @@ fn main() -> ! {
         cp.SYST.enable_interrupt();
     };
     let reload_val = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
-    fe_rtos::task::start_scheduler(
-        cortex_m::peripheral::SCB::set_pendsv,
-        enable_systick,
-        reload_val as usize,
-    );
+    fe_rtos::task::start_scheduler(enable_systick, reload_val as usize);
 
     loop {}
 }

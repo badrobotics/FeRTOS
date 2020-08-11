@@ -5,7 +5,6 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use cortex_m::peripheral::scb::Exception;
 use fe_osi::allocator::get_heap_remaining;
 
 fn write_byte(c: u8) {
@@ -59,29 +58,11 @@ fn spawn_task(_: &mut usize) {
 fn main() -> ! {
     let mut p = cortex_m::peripheral::Peripherals::take().unwrap();
 
-    fe_rtos::arch::int_register(
-        Exception::SysTick.irqn(),
-        fe_rtos::task::sys_tick as *const usize,
-    );
-    fe_rtos::arch::int_register(
-        Exception::PendSV.irqn(),
-        fe_rtos::task::context_switch as *const usize,
-    );
-    fe_rtos::arch::int_register(
-        Exception::SVCall.irqn(),
-        fe_rtos::syscall::svc_handler as *const usize,
-    );
+    fe_rtos::arch::arch_setup(&mut p);
 
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, hello_task, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, writer_task, None);
     fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, spawn_task, None);
-
-    //It's probably a good idea to have the context switch be the lowest
-    //priority interrupt.
-    unsafe {
-        p.SCB
-            .set_priority(cortex_m::peripheral::scb::SystemHandler::PendSV, 7);
-    }
 
     fe_osi::set_putc(|c: char| {
         write_byte(c as u8);
@@ -95,11 +76,7 @@ fn main() -> ! {
         p.SYST.enable_interrupt();
     };
     let reload_val = cortex_m::peripheral::SYST::get_ticks_per_10ms() / 10;
-    fe_rtos::task::start_scheduler(
-        cortex_m::peripheral::SCB::set_pendsv,
-        enable_systick,
-        reload_val as usize,
-    );
+    fe_rtos::task::start_scheduler(enable_systick, reload_val as usize);
 
     loop {}
 }
