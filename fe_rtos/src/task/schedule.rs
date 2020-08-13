@@ -9,6 +9,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 pub(crate) trait Scheduler {
     fn add_task(&mut self, new_task: Arc<Task>);
     fn next(&mut self) -> Option<Arc<Task>>;
+    fn remove_task(&mut self, pid: usize);
 }
 
 pub(crate) struct RoundRobin {
@@ -65,22 +66,21 @@ impl Scheduler for RoundRobin {
             let task = &self.queue[idx];
             let state = task.state.try_get().unwrap_or(TaskState::Runnable);
 
-            match state {
-                TaskState::Runnable => {
-                    self.increment_index();
-                    return Some(Arc::clone(&task));
-                }
-                TaskState::Zombie => {
-                    self.queue.swap_remove(idx);
-
-                    if idx != 0 {
-                        self.current_index.fetch_sub(1, Ordering::SeqCst);
-                    }
-                }
-                _ => (),
-            };
+            if let TaskState::Runnable = state {
+                self.increment_index();
+                return Some(Arc::clone(&task));
+            }
 
             self.increment_index();
+        }
+    }
+
+    fn remove_task(&mut self, pid: usize) {
+        for idx in 0..self.queue.len() {
+            if pid == self.queue[idx].pid {
+                self.queue.swap_remove(idx);
+                break;
+            }
         }
     }
 }
