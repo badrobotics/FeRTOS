@@ -5,6 +5,7 @@ mod schedule;
 mod task_state;
 mod tick;
 
+use crate::arch;
 use crate::spinlock::Spinlock;
 use crate::syscall;
 use crate::task::schedule::{RoundRobin, Scheduler};
@@ -54,8 +55,7 @@ pub(crate) struct NewTaskInfo {
     pub param: *mut u32,
 }
 
-const INIT_XPSR: usize = 0x01000000;
-const STACK_CANARY: usize = 0xC0DE5AFE;
+pub(crate) const STACK_CANARY: usize = 0xC0DE5AFE;
 /// The default and recommended stack size for a task.
 pub const DEFAULT_STACK_SIZE: usize = 1536;
 
@@ -76,13 +76,6 @@ static mut NEXT_TASK: Option<Arc<Task>> = None;
 static mut CUR_TASK: Option<&mut Task> = None;
 lazy_static! {
     static ref NEW_TASK_QUEUE: SegQueue<Arc<Task>> = SegQueue::new();
-}
-
-static mut TRIGGER_CONTEXT_SWITCH: fn() = idle;
-
-extern "C" {
-    /// Context switch interrupt handler. This should never be called directly.
-    pub fn context_switch();
 }
 
 unsafe fn get_cur_task_mut() -> &'static mut Task {
@@ -146,16 +139,11 @@ pub(crate) unsafe fn do_context_switch() {
     if CS_LOCK.try_take() {
         scheduler();
         CS_LOCK.give();
-        TRIGGER_CONTEXT_SWITCH();
+        arch::trigger_context_switch();
     }
 }
 
-/// The systick interrupt handler.
-///
-/// # Safety
-/// This function should not be called directly, and should only be called by
-/// the system tick interrupt.
-pub unsafe extern "C" fn sys_tick() {
+pub(crate) unsafe extern "C" fn sys_tick() {
     TICKS.inc();
     do_context_switch();
 }
@@ -185,44 +173,6 @@ pub(crate) fn block(sem: *const Semaphore) -> bool {
     }
 }
 
-//This function is necesarry right, but will make it easier to refactor when we add different archs
-unsafe fn set_canary(stack_bottom: *const usize, _stack_size: usize) -> *const usize {
-    //In arm, the canary will be the bottom of the stack
-    let canary = stack_bottom as *mut usize;
-    *canary = STACK_CANARY;
-    canary
-}
-
-//See section 2.5.7.1 and Figure 2-7 in the TM4C123 datasheet for more information
-unsafe fn set_initial_stack(
-    stack_bottom: *const usize,
-    stack_size: usize,
-    entry_point: *const usize,
-    param: *mut usize,
-) -> *const usize {
-    //Arm uses a full descending stack, so we have to start from the top
-    let stack_top = (stack_bottom as usize) + stack_size;
-    let mut cur_ptr = (stack_top - size_of::<usize>()) as *mut usize;
-
-    //Set the xPSR
-    *cur_ptr = INIT_XPSR;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    //Set the PC
-    *cur_ptr = entry_point as usize;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    //Set the LR
-    *cur_ptr = idle as usize;
-    cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-
-    for _i in 0..13 {
-        *cur_ptr = param as usize;
-        cur_ptr = (cur_ptr as usize - size_of::<usize>()) as *mut usize;
-    }
-    (cur_ptr as usize + size_of::<usize>()) as *const usize
-}
-
 fn get_new_pid() -> usize {
     static PID: AtomicUsize = AtomicUsize::new(1);
     PID.fetch_add(1, Ordering::SeqCst)
@@ -239,8 +189,8 @@ pub(crate) unsafe fn add_task(
     sp.ptr = &stack[0] as *const usize;
     let stack_size_bytes = size_of::<usize>() * stack_size;
 
-    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
-    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param);
+    let canary: &'static usize = &*arch::set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = arch::set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param);
 
     let new_task = Task {
         sp,
@@ -275,8 +225,8 @@ pub(crate) unsafe fn add_task_static(
         None => null_mut(),
     };
 
-    let canary: &'static usize = &*set_canary(sp.ptr, stack_size_bytes);
-    sp.ptr = set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param_ptr);
+    let canary: &'static usize = &*arch::set_canary(sp.ptr, stack_size_bytes);
+    sp.ptr = arch::set_initial_stack(sp.ptr, stack_size_bytes, entry_point, param_ptr);
 
     let new_task = Task {
         sp,
@@ -325,11 +275,7 @@ pub(crate) unsafe fn remove_task() -> bool {
 /// trigger_context_switch is a pointer to a function that forces a context switch
 /// enable_systic is a closure that enables the systick interrupt
 /// reload_val is the number of counts on the systick counter in a tick
-pub fn start_scheduler<F: FnOnce(usize)>(
-    trigger_context_switch: fn(),
-    enable_systick: F,
-    reload_val: usize,
-) {
+pub fn start_scheduler<F: FnOnce(usize)>(enable_systick: F, reload_val: usize) {
     syscall::link_syscalls();
 
     unsafe {
@@ -341,7 +287,6 @@ pub fn start_scheduler<F: FnOnce(usize)>(
         );
         //Add something to the scheduler queue so something can run right away
         KERNEL_TASK = Some(Arc::clone(&kernel_task_ref));
-        TRIGGER_CONTEXT_SWITCH = trigger_context_switch;
     }
 
     enable_systick(reload_val);
@@ -472,6 +417,6 @@ fn kernel(_: &mut u32) {
     }
 }
 
-fn idle() {
+pub(crate) fn idle() {
     loop {}
 }

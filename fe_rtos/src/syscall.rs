@@ -1,7 +1,7 @@
 extern crate alloc;
 
+use crate::arch;
 use crate::fe_alloc;
-use crate::interrupt;
 use crate::ipc;
 use crate::task;
 use alloc::boxed::Box;
@@ -11,11 +11,6 @@ use cstr_core::{c_char, CStr};
 use fe_osi::allocator::LayoutFFI;
 use fe_osi::ipc::Message;
 use fe_osi::semaphore::Semaphore;
-
-extern "C" {
-    /// The system call handler. This should never be called directly.
-    pub fn svc_handler();
-}
 
 //For the linker to link the syscalls, a function in this
 //file must be called from elsewhere...
@@ -221,6 +216,6 @@ extern "C" fn sys_get_heap_remaining() -> usize {
 
 #[no_mangle]
 extern "C" fn sys_interrupt_register(irqn: isize, handler: *const usize) -> usize {
-    interrupt::int_register(irqn as i8, handler);
+    arch::int_register(irqn as i8, handler);
     0
 }
