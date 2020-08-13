@@ -112,8 +112,6 @@ extern "C" fn sys_ipc_publish(c_topic: *const c_char, msg_ptr: *mut u8, msg_len:
         let topic: &str = match CStr::from_ptr(c_topic).to_str() {
             Ok(topic) => topic,
             Err(_) => {
-                // Invalid topic string. Create vector so the compiler can dealloc
-                Vec::from_raw_parts(msg_ptr, msg_len, msg_len);
                 // return early indicating failure
                 return 1;
             }
