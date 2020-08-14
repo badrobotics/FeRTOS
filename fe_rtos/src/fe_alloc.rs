@@ -232,8 +232,6 @@ unsafe fn init_heap() {
 }
 
 pub(crate) unsafe fn clear_deleted_task(pid: usize) {
-    //CLEARING_TASK is needed because dropping a box will
-    //enable interrupts
     let mut i = 0;
 
     ALLOC_LOCK.take();
