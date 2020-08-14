@@ -42,10 +42,12 @@ pub fn print_msg(msg: &str) {
 }
 
 /// Causes the calling task to exit.
-pub fn exit() -> usize {
-    unsafe {
-        do_exit();
-    }
+///
+/// # Safety
+/// Calls to this function may result in a memory leak if the calling task has
+/// not freed all of its dynamically allocated memory before hand.
+pub unsafe fn exit() -> usize {
+    do_exit();
     //Execution should never reach here
     loop {}
 }

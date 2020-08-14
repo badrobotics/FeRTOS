@@ -59,7 +59,9 @@ fn error_handler(layout: Layout) -> ! {
     print_msg(core::str::from_utf8(&digits[start_idx..]).unwrap());
     putc('\n');
 
-    crate::exit();
+    unsafe {
+        crate::exit();
+    }
 
     loop {}
 }

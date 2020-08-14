@@ -61,9 +61,8 @@ fn panic(panic_info: &PanicInfo<'_>) -> ! {
     }
     unsafe {
         super::enable_interrupts();
+        fe_osi::exit();
     }
-
-    fe_osi::exit();
 
     loop {}
 }
