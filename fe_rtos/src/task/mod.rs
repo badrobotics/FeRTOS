@@ -258,7 +258,9 @@ pub(crate) fn new_task_helper(task_info: Box<NewTaskInfo>) -> ! {
 
     task_ep(task_param);
 
-    fe_osi::exit();
+    unsafe {
+        fe_osi::exit();
+    }
 
     loop {}
 }
@@ -343,7 +345,9 @@ fn kernel(_: &mut u32) {
                 fe_osi::print_msg("Stack overflow in task ");
                 fe_osi::print_msg(core::str::from_utf8(&digits[start_idx..]).unwrap());
                 fe_osi::print_msg("!\n");
-                fe_osi::exit();
+                unsafe {
+                    fe_osi::exit();
+                }
             }
 
             //We want to default to Runnable because if a task is in a transition state,
