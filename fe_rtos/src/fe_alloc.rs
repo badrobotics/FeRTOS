@@ -1,9 +1,6 @@
 extern crate alloc;
 
 use crate::spinlock::Spinlock;
-use crate::task::get_cur_task;
-use alloc::boxed::Box;
-use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use fe_osi::allocator::LayoutFFI;
@@ -28,14 +25,6 @@ static mut FREE_LIST: *mut u8 = null_mut();
 static mut NUM_BLOCKS: usize = 0;
 static mut HEAP: *mut u8 = null_mut();
 static mut HEAP_REMAINING: usize = 0;
-
-struct AllocData {
-    ptr: *mut u8,
-    blocks: usize,
-    pid: usize,
-}
-
-static mut ALLOC_LIST: Vec<AllocData> = Vec::new();
 
 /// The global allocator for FeRTOS.
 /// KernelAllocator is enabled automatically by the crate
@@ -81,8 +70,6 @@ fn get_bit_mask(bit: usize, blocks_remaining: usize, cur_block: &mut usize) -> u
 }
 
 pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
-    static mut ADDING_TO_LIST: bool = false;
-
     //If HEAP points to zero, we need to initialize the heap
     ALLOC_LOCK.take();
     if (HEAP as usize) == 0 {
@@ -142,16 +129,6 @@ pub(crate) unsafe fn alloc(layout: LayoutFFI) -> *mut u8 {
         }
     }
 
-    if !data_ptr.is_null() && !ADDING_TO_LIST {
-        ADDING_TO_LIST = true;
-        ALLOC_LIST.push(AllocData {
-            ptr: data_ptr,
-            blocks: blocks_needed,
-            pid: get_cur_task().pid,
-        });
-        ADDING_TO_LIST = false;
-    }
-
     ALLOC_LOCK.give();
 
     data_ptr
@@ -163,18 +140,7 @@ pub(crate) unsafe fn dealloc(ptr: *mut u8, layout: LayoutFFI) {
     let mut cur_block = start_block;
 
     ALLOC_LOCK.take();
-    //Remove the entry corresponding to ptr from the ALLOC_LIST
-    let mut index: usize = usize::MAX;
-    for (i, entry) in ALLOC_LIST.iter().enumerate() {
-        if entry.ptr == ptr {
-            index = i;
-            break;
-        }
-    }
-
-    let num_blocks = if index != usize::MAX {
-        ALLOC_LIST.swap_remove(index).blocks
-    } else if layout.size % BLOCK_SIZE == 0 {
+    let num_blocks = if layout.size % BLOCK_SIZE == 0 {
         layout.size / BLOCK_SIZE
     } else {
         (layout.size / BLOCK_SIZE) + 1
@@ -229,20 +195,6 @@ unsafe fn init_heap() {
 
     // Set all of the blocks to free
     core::ptr::write_bytes(FREE_LIST, 0, free_list_size);
-}
-
-pub(crate) unsafe fn clear_deleted_task(pid: usize) {
-    let mut i = 0;
-
-    ALLOC_LOCK.take();
-    while i < ALLOC_LIST.len() {
-        if ALLOC_LIST[i].pid == pid {
-            Box::from_raw(ALLOC_LIST[i].ptr);
-        } else {
-            i += 1;
-        }
-    }
-    ALLOC_LOCK.give();
 }
 
 pub fn get_heap_remaining() -> usize {
