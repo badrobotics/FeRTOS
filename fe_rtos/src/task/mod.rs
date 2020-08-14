@@ -405,8 +405,6 @@ fn kernel(_: &mut u32) {
 
             unsafe {
                 SCHEDULER.remove_task(removed_task.pid);
-                //Clear any remaining leftover dynamically allocated data
-                crate::fe_alloc::clear_deleted_task(removed_task.pid);
             }
         }
 
