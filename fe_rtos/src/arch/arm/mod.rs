@@ -6,6 +6,8 @@ use cortex_m::peripheral::scb::Exception;
 extern "C" {
     fn context_switch();
     fn svc_handler();
+    pub(crate) fn disable_interrupts();
+    pub(crate) fn enable_interrupts();
 }
 
 /// Sets up everything the arm needs before starting FeRTOS.

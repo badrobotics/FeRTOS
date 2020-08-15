@@ -317,7 +317,7 @@ fn kernel(_: &mut u32) {
         //Make sure the kernel gets added to the scheduler when it starts
         if first_push {
             unsafe {
-                super::disable_interrupts();
+                arch::disable_interrupts();
             }
         }
         //Add all new tasks to the task list
@@ -337,7 +337,7 @@ fn kernel(_: &mut u32) {
         if first_push {
             first_push = false;
             unsafe {
-                super::enable_interrupts();
+                arch::enable_interrupts();
             }
         }
 

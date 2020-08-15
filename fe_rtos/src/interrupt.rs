@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use crate::arch;
 use crate::task::get_cur_task;
 use alloc::format;
 use core::panic::PanicInfo;
@@ -44,7 +45,7 @@ fn panic(panic_info: &PanicInfo<'_>) -> ! {
     let pid = unsafe { get_cur_task().pid };
 
     unsafe {
-        super::disable_interrupts();
+        arch::disable_interrupts();
     }
 
     //Output which process has panicked
@@ -60,7 +61,7 @@ fn panic(panic_info: &PanicInfo<'_>) -> ! {
         print_msg(format!("{}\n", msg).as_str());
     }
     unsafe {
-        super::enable_interrupts();
+        arch::enable_interrupts();
         fe_osi::exit();
     }
 

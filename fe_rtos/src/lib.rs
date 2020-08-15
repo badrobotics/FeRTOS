@@ -26,8 +26,3 @@ use fe_alloc::KernelAllocator;
 //Declare the heap allocator so we can use Rust's collections
 #[global_allocator]
 static mut A: KernelAllocator = KernelAllocator;
-
-extern "C" {
-    fn disable_interrupts();
-    fn enable_interrupts();
-}
