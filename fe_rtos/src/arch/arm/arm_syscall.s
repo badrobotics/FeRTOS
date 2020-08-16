@@ -14,7 +14,7 @@
     .weak sys_get_heap_remaining
     .weak sys_interrupt_register
     .global svc_handler
-.equ max_svc, 11
+.equ max_svc, 12
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arm Cortex-M interrupt stack frame order:

@@ -9,7 +9,7 @@
     .thumb_func
 context_switch:
     //R0 - Current Task
-    //R1 - Next Task
+    //R4 - Next Task
 
     //Push registers R4-R11 of the old task
     PUSH {R4 - R11}
