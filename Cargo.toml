@@ -4,4 +4,5 @@ members = [
 	"fe_osi",
 	"examples/qemu_project",
 	"examples/fertos_project",
+	"examples/riscv32_example",
 ]

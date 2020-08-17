@@ -16,6 +16,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         Build::new()
             .file("./src/arch/arm/arm_syscall.s")
             .compile("syscall_asm");
+    } else if arch == "riscv32" {
+        Build::new()
+            .file("./src/arch/riscv32/riscv32.s")
+            .compile("asm");
+        Build::new()
+            .file("./src/arch/riscv32/riscv32_syscall.s")
+            .compile("syscall_asm");
     } else {
         println!("Invalid architecture: {}", arch);
     }

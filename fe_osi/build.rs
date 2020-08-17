@@ -13,6 +13,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if arch == "arm" {
         Build::new().file("./src/arm.s").compile("asm");
+    } else if arch == "riscv32" {
+        Build::new().file("./src/riscv32.s").compile("asm");
     } else {
         println!("Invalid architecture: {}", arch);
     }

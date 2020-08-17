@@ -17,4 +17,4 @@ pub(crate) unsafe fn set_initial_stack(
     core::ptr::null()
 }
 
-pub fn int_register(_irqn: i8, _int_handler: *const usize) {}
+pub(crate) unsafe fn int_register(_irqn: isize, _int_handler: *const usize) {}

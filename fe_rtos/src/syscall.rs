@@ -219,6 +219,8 @@ extern "C" fn sys_get_heap_remaining() -> usize {
 
 #[no_mangle]
 extern "C" fn sys_interrupt_register(irqn: isize, handler: *const usize) -> usize {
-    arch::int_register(irqn as i8, handler);
+    unsafe {
+        arch::int_register(irqn, handler);
+    }
     0
 }
