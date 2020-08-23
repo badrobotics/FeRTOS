@@ -50,9 +50,18 @@ pub(crate) struct Task {
 unsafe impl Send for Task {}
 unsafe impl Sync for Task {}
 
+impl Task {
+    pub(crate) fn give(&self) {
+        if let Some(task_info) = &self.task_info {
+            task_info.sem.give();
+        }
+    }
+}
+
 pub(crate) struct NewTaskInfo {
     pub ep: *const u32,
     pub param: *mut u32,
+    pub sem: Arc<Semaphore>,
 }
 
 pub(crate) const STACK_CANARY: usize = 0xC0DE5AFE;

@@ -6,6 +6,7 @@ use crate::ipc;
 use crate::task;
 use alloc::boxed::Box;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use cstr_core::{c_char, CStr};
 use fe_osi::allocator::LayoutFFI;
@@ -25,6 +26,8 @@ extern "C" fn sys_exit() -> usize {
                 ipc::TOPIC_REGISTERY.unsubscribe_from_topic(&topic);
             }
         });
+
+        task::get_cur_task().give();
 
         while !task::remove_task() {
             sys_yield();
@@ -78,10 +81,12 @@ extern "C" fn sys_task_spawn(
     stack_size: usize,
     entry_point: *const u32,
     parameter: *mut u32,
-) -> usize {
+) -> *const Semaphore {
+    let sem = Arc::new(Semaphore::new(0));
     let task_info = Box::new(task::NewTaskInfo {
         ep: entry_point,
         param: parameter,
+        sem: Arc::clone(&sem),
     });
 
     unsafe {
@@ -92,7 +97,7 @@ extern "C" fn sys_task_spawn(
         );
     }
 
-    0
+    Arc::into_raw(sem)
 }
 
 #[no_mangle]

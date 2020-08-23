@@ -53,8 +53,8 @@ fn test_task(_: &mut usize) {
 
 fn spawn_task(_: &mut usize) {
     loop {
-        fe_osi::task::task_spawn(fe_rtos::task::DEFAULT_STACK_SIZE, test_task, None);
-        fe_osi::sleep(2000);
+        fe_osi::task::task_spawn_block(fe_rtos::task::DEFAULT_STACK_SIZE, test_task, None);
+        fe_osi::sleep(1000);
     }
 }
 
