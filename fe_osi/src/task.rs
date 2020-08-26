@@ -20,6 +20,7 @@ extern "C" {
 ///     loop {}
 /// }
 /// task_spawn(1024, test_task, None);
+/// ```
 pub fn task_spawn<T: Send>(
     stack_size: usize,
     entry_point: fn(&mut T),
