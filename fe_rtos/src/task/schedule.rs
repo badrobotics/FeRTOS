@@ -15,7 +15,7 @@ pub(crate) trait Scheduler {
 pub(crate) struct RoundRobin {
     queue: Vec<Arc<Task>>,
     current_index: AtomicUsize,
-    pushing_task: AtomicBool,
+    busy: AtomicBool,
 }
 
 impl RoundRobin {
@@ -23,7 +23,7 @@ impl RoundRobin {
         RoundRobin {
             queue: Vec::new(),
             current_index: AtomicUsize::new(0),
-            pushing_task: AtomicBool::new(false),
+            busy: AtomicBool::new(false),
         }
     }
 
@@ -39,15 +39,15 @@ impl RoundRobin {
 
 impl Scheduler for RoundRobin {
     fn add_task(&mut self, new_task: Arc<Task>) {
-        self.pushing_task.store(true, Ordering::SeqCst);
+        self.busy.store(true, Ordering::SeqCst);
         self.queue.push(new_task);
-        self.pushing_task.store(false, Ordering::SeqCst);
+        self.busy.store(false, Ordering::SeqCst);
     }
 
     fn next(&mut self) -> Option<Arc<Task>> {
         //Because the scheduler function can't block, return None if something
         //is being pushed to the queue
-        if self.pushing_task.load(Ordering::SeqCst) {
+        if self.busy.load(Ordering::SeqCst) {
             return None;
         }
         if self.queue.is_empty() {
@@ -76,11 +76,13 @@ impl Scheduler for RoundRobin {
     }
 
     fn remove_task(&mut self, pid: usize) {
+        self.busy.store(true, Ordering::SeqCst);
         for idx in 0..self.queue.len() {
             if pid == self.queue[idx].pid {
                 self.queue.swap_remove(idx);
                 break;
             }
         }
+        self.busy.store(false, Ordering::SeqCst);
     }
 }
