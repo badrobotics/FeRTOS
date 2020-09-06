@@ -11,7 +11,10 @@ extern crate fe_osi;
 #[cfg(target_arch = "arm")]
 #[path = "arch/arm/mod.rs"]
 pub mod arch;
-#[cfg(not(target_arch = "arm"))]
+#[cfg(target_arch = "riscv32")]
+#[path = "arch/riscv32/mod.rs"]
+pub mod arch;
+#[cfg(not(any(target_arch = "arm", target_arch = "riscv32")))]
 #[path = "arch/none/mod.rs"]
 pub mod arch;
 mod fe_alloc;
@@ -26,8 +29,3 @@ use fe_alloc::KernelAllocator;
 //Declare the heap allocator so we can use Rust's collections
 #[global_allocator]
 static mut A: KernelAllocator = KernelAllocator;
-
-extern "C" {
-    fn disable_interrupts();
-    fn enable_interrupts();
-}

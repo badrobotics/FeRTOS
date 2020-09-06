@@ -27,7 +27,7 @@ version = "1.4.0"
 features = ["spin_no_std"]
 
 [dependencies.cstr_core]
-version = "0.1.2"
+version = "0.2.1"
 features = ["alloc"]
 
 [target.'cfg(target_arch = "arm")'.dependencies]
