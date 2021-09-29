@@ -20,7 +20,8 @@ impl TickCounter {
         if self.lsb.load(Ordering::SeqCst) < old_lsb {
             let old_msb = self.msb.load(Ordering::SeqCst);
             self.msb
-                .compare_and_swap(old_msb, old_msb + 1, Ordering::SeqCst);
+                .compare_exchange(old_msb, old_msb + 1, Ordering::SeqCst, Ordering::SeqCst)
+                .unwrap();
         }
     }
 

@@ -50,8 +50,8 @@ impl Semaphore {
 
             if self
                 .count
-                .compare_and_swap(old_val, old_val - 1, Ordering::SeqCst)
-                == old_val
+                .compare_exchange(old_val, old_val - 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
             {
                 break;
             }
@@ -68,8 +68,8 @@ impl Semaphore {
         }
 
         self.count
-            .compare_and_swap(old_val, old_val - 1, Ordering::SeqCst)
-            == old_val
+            .compare_exchange(old_val, old_val - 1, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
     }
 
     /// In a mutex Semaphore, give() sets the count to 1.
