@@ -19,7 +19,11 @@ impl Spinlock {
         let pid = unsafe { get_cur_task().pid };
 
         loop {
-            if self.count.compare_and_swap(0, 1, Ordering::SeqCst) == 0 {
+            if self
+                .count
+                .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
                 self.pid.store(pid, Ordering::SeqCst);
                 break;
             } else if pid == self.pid.load(Ordering::SeqCst) {
@@ -36,7 +40,11 @@ impl Spinlock {
 
         //Don't check if our pid is the same as the lock's pid because interrupts
         //can screw with that.
-        if self.count.compare_and_swap(0, 1, Ordering::SeqCst) == 0 {
+        if self
+            .count
+            .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
             self.pid.store(pid, Ordering::SeqCst);
             true
         } else {
