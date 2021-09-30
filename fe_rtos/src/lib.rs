@@ -1,8 +1,8 @@
 #![no_std]
 #![feature(const_btree_new)]
-#![feature(const_mut_refs)]
 #![feature(linked_list_remove)]
 #![feature(panic_info_message)]
+#![allow(clippy::empty_loop)]
 
 #[macro_use]
 extern crate lazy_static;

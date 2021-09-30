@@ -21,7 +21,7 @@ impl TickCounter {
             let old_msb = self.msb.load(Ordering::SeqCst);
             self.msb
                 .compare_exchange(old_msb, old_msb + 1, Ordering::SeqCst, Ordering::SeqCst)
-                .unwrap();
+                .ok();
         }
     }
 

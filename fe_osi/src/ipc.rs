@@ -29,9 +29,9 @@ impl From<Vec<u8>> for Message {
     }
 }
 
-impl Into<Vec<u8>> for Message {
-    fn into(self) -> Vec<u8> {
-        unsafe { Vec::from_raw_parts(self.msg_ptr, self.msg_len, self.msg_len) }
+impl From<Message> for Vec<u8> {
+    fn from(msg: Message) -> Vec<u8> {
+        unsafe { Vec::from_raw_parts(msg.msg_ptr, msg.msg_len, msg.msg_len) }
     }
 }
 
