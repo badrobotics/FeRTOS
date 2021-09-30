@@ -53,13 +53,10 @@ impl TopicRegistry {
             .and_then(|topic| topic.subscribers.get_mut(&cur_pid))
             .and_then(|subscriber| {
                 let next_node: Arc<MessageNode> = match &subscriber.next_message {
-                    Some(m) => Arc::clone(&m),
+                    Some(m) => Arc::clone(m),
                     None => return None,
                 };
-                subscriber.next_message = match &*next_node.next.borrow() {
-                    Some(m) => Some(Arc::clone(&m)),
-                    None => None,
-                };
+                subscriber.next_message = (*next_node.next.borrow()).as_ref().map(Arc::clone);
                 Some(next_node.data.clone())
             })
     }

@@ -117,14 +117,14 @@ pub(crate) unsafe extern "C" fn get_next_task() -> &'static Task {
 
 unsafe fn scheduler() {
     let default_task = match &KERNEL_TASK {
-        Some(task) => Arc::clone(&task),
+        Some(task) => Arc::clone(task),
         //The code should never get here
         None => panic!("No valid KERNEL_TASK in scheduler"),
     };
 
     //Make sure we don't accidentally drop a task
     let count = match &NEXT_TASK {
-        Some(task) => Arc::strong_count(&task),
+        Some(task) => Arc::strong_count(task),
         None => 0xFF,
     };
     if count == 1 {

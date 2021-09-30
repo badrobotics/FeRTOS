@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(alloc_error_handler)]
 #![feature(vec_into_raw_parts)]
+#![allow(clippy::empty_loop)]
 
 pub mod allocator;
 pub mod interrupt;

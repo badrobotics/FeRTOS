@@ -68,7 +68,7 @@ impl Scheduler for RoundRobin {
 
             if let TaskState::Runnable = state {
                 self.increment_index();
-                return Some(Arc::clone(&task));
+                return Some(Arc::clone(task));
             }
 
             self.increment_index();
