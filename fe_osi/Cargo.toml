@@ -5,7 +5,7 @@ authors = [
     "Bijan Tabatabai <bijan311@gmail.com>",
     "Dakota Kitzman <dakota.kitzman@gmail.com>"
 ]
-edition = "2018"
+edition = "2021"
 description = "OSI to help with writing code for fe_rtos"
 readme = "../README.md"
 repository = "https://github.com/badrobotics/FeRTOS"

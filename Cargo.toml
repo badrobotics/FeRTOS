@@ -5,3 +5,6 @@ members = [
 	"examples/qemu_project",
 	"examples/fertos_project",
 ]
+exclude = [
+    "examples/riscv32_example",
+]

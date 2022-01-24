@@ -5,7 +5,7 @@ authors = [
     "Bijan Tabatabai <bijan311@gmail.com>",
     "Dakota Kitzman <dakota.kitzman@gmail.com>"
 ]
-edition = "2018"
+edition = "2021"
 description = "A simple OS for Arm Cortex-M CPUs"
 readme = "../README.md"
 repository = "https://github.com/badrobotics/FeRTOS"
